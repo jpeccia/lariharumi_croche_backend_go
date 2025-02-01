@@ -42,3 +42,11 @@ func DeleteCategory(categoryID uint) error {
 	}
 	return nil
 }
+
+// UpdateCategory atualiza uma categoria no banco de dados
+func UpdateCategory(category *model.Category) error {
+	if err := config.DB.Save(category).Error; err != nil {
+		return err
+	}
+	return nil
+}

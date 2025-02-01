@@ -36,6 +36,9 @@ func SetupRouter() *gin.Engine {
 		admin.DELETE("/products/:id", handler.DeleteProduct) // DELETE product
 		admin.POST("/categories", handler.CreateCategory) // POST create category
 		admin.DELETE("/categories/:id", handler.DeleteCategory) // DELETE category
+			// Rotas para upload de imagem
+		admin.POST("/products/:id/upload-image", handler.UploadProductImage)
+		admin.POST("/categories/:id/upload-image", handler.UploadCategoryImage)
 	}
 
 	return r

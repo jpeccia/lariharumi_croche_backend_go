@@ -53,3 +53,18 @@ func GetCategoryImage(categoryID uint) (string, error) {
 
 	return category.Image, nil
 }
+
+func AddCategoryImage(categoryID uint, imagePath string) error {
+	category, err := repository.GetCategoryByID(categoryID)
+	if err != nil || category == nil {
+		return err
+	}
+
+	// Atualiza a imagem da categoria
+	category.Image = imagePath
+	if err := repository.UpdateCategory(category); err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -80,4 +81,39 @@ func GetCategoryImage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"image": image})
+}
+
+// UploadCategoryImage realiza o upload de uma imagem para uma categoria
+func UploadCategoryImage(c *gin.Context) {
+	// Obtém o id da categoria da URL
+	categoryIDStr := c.Param("id")
+	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID da categoria inválido"})
+		return
+	}
+
+	// Obtém o arquivo do formulário multipart
+	file, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Imagem não encontrada: " + err.Error()})
+		return
+	}
+
+	// Define um caminho para salvar a imagem (ajuste conforme sua necessidade)
+	filename := filepath.Base(file.Filename)
+	uploadPath := "./uploads/categories/" + filename
+
+	if err := c.SaveUploadedFile(file, uploadPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar a imagem: " + err.Error()})
+		return
+	}
+
+	// Atualiza a categoria com a nova imagem. Aqui, você pode chamar uma função no service.
+	if err := service.AddCategoryImage(uint(categoryID), uploadPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar categoria com imagem: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Imagem enviada com sucesso!", "path": uploadPath})
 }
