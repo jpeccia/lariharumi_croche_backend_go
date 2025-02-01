@@ -6,6 +6,7 @@ import (
 
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/repository"
+	"github.com/jpeccia/lariharumi_croche_backend_go/internal/util"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -43,4 +44,27 @@ func RegisterUser(name, email, password string) (*model.User, error) {
 	}
 
 	return user, nil
+}
+
+// LoginUser verifica o email e senha do usuário, e gera um token JWT se forem válidos
+func LoginUser(email, password string) (string, error) {
+	// Busca o usuário no banco de dados
+	user, err := repository.GetUserByEmail(email)
+	if err != nil {
+		return "", errors.New("usuário não encontrado")
+	}
+
+	// Verifica a senha
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	if err != nil {
+		return "", errors.New("senha incorreta")
+	}
+
+	// Gera o token JWT
+	token, err := util.GenerateToken(user)
+	if err != nil {
+		return "", errors.New("erro ao gerar token")
+	}
+
+	return token, nil
 }
