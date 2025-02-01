@@ -2,11 +2,11 @@ package model
 
 import "gorm.io/gorm"
 
-type Role string
+type UserRole string
 
 const (
-	Admin Role = "ADMIN"
-	User  Role = "USER"
+	AdminRole UserRole = "ADMIN"
+	UserRole  UserRole = "USER"
 )
 
 type User struct {
@@ -14,6 +14,5 @@ type User struct {
 	Name string `json:"name"`
 	Email string `json:"email" gorm:"unique"`
 	Password string `json:"password"`
-	Role Role `json:"role"`
-
+	Role     UserRole `json:"role"` // Role do usuário: ADMIN ou USER
 }
