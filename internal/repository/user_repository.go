@@ -6,19 +6,59 @@ import (
 	"gorm.io/gorm"
 )
 
+// CreateUser cria um novo usuário no banco de dados
 func CreateUser(user *model.User) error {
-	return config.DB.Create(user).Error
+	if err := config.DB.Create(user).Error; err != nil {
+		return err
+	}
+	return nil
 }
 
-func GetUserByEmail(email string) (*model.User, error) {
+// GetUserByID retorna um usuário pelo seu ID
+func GetUserByID(userID uint) (*model.User, error) {
 	var user model.User
-	result := config.DB.Where("email = ?", email).First(&user)
-	if result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
-			// Retorna nil para o usuário e nil para o erro, indicando que o usuário não foi encontrado.
+	if err := config.DB.First(&user, userID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
-		return nil, result.Error
+		return nil, err
 	}
 	return &user, nil
+}
+
+// GetUserByEmail retorna um usuário pelo seu email
+func GetUserByEmail(email string) (*model.User, error) {
+	var user model.User
+	if err := config.DB.Where("email = ?", email).First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
+// GetUsers retorna todos os usuários
+func GetUsers() ([]model.User, error) {
+	var users []model.User
+	if err := config.DB.Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+// UpdateUser atualiza as informações de um usuário
+func UpdateUser(user *model.User) error {
+	if err := config.DB.Save(user).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+// DeleteUser deleta um usuário pelo seu ID
+func DeleteUser(userID uint) error {
+	if err := config.DB.Delete(&model.User{}, userID).Error; err != nil {
+		return err
+	}
+	return nil
 }
