@@ -102,3 +102,24 @@ func GetProductImages(productID uint) ([]string, error) {
 	imagePaths := repository.ParseImageUrls(product.ImageUrls)
 	return imagePaths, nil
 }
+
+// DeleteProduct deleta um produto do banco de dados
+func DeleteProduct(productID uint) error {
+	// Tenta encontrar o produto
+	product, err := repository.GetProductByID(productID)
+	if err != nil {
+		return err
+	}
+
+	// Verifica se o produto existe
+	if product == nil {
+		return errors.New("produto não encontrado")
+	}
+
+	// Deleta o produto
+	if err := repository.DeleteProduct(productID); err != nil {
+		return err
+	}
+
+	return nil
+}

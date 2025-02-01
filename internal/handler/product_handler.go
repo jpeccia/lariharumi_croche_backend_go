@@ -41,6 +41,26 @@ func CreateProduct(c *gin.Context) {
 	c.JSON(http.StatusCreated, product)
 }
 
+// DeleteProduct deleta um produto pelo ID (exige token de admin)
+func DeleteProduct(c *gin.Context) {
+	// Obtém o id do produto da URL
+	productIDStr := c.Param("id")
+	productID, err := strconv.ParseUint(productIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID do produto inválido"})
+		return
+	}
+
+	// Chama o serviço para deletar o produto
+	if err := service.DeleteProduct(uint(productID)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao deletar produto: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Produto deletado com sucesso!"})
+}
+
+
 // UploadProductImage realiza o upload de uma imagem para um produto
 func UploadProductImage(c *gin.Context) {
 	// Obtém o id do produto da URL

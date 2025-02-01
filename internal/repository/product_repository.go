@@ -63,3 +63,12 @@ func ParseImageUrls(imageUrls string) []string {
 func JoinImageUrls(imagePaths []string) string {
 	return strings.Join(imagePaths, ",")
 }
+
+// DeleteProduct deleta um produto pelo ID
+func DeleteProduct(productID uint) error {
+	var product model.Product
+	if err := config.DB.Delete(&product, productID).Error; err != nil {
+		return err
+	}
+	return nil
+}
