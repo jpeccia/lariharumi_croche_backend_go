@@ -167,3 +167,4 @@ func GetProductImages(c *gin.Context) {
 
 	c.JSON(http.StatusOK, images)
 }
+
