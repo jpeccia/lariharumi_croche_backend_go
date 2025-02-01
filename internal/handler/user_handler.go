@@ -27,3 +27,27 @@ func RegisterUser(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, user)
 }
+
+// LoginUser recebe as credenciais e retorna um token JWT
+func LoginUser(c *gin.Context) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	// Valida o corpo da requisição
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Chama o serviço de login
+	token, err := service.LoginUser(req.Email, req.Password)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Retorna o token para o usuário
+	c.JSON(http.StatusOK, gin.H{"token": token})
+}
