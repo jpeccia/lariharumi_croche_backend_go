@@ -20,8 +20,8 @@ Esta API é um sistema completo de gerenciamento de produtos e categorias com au
 
 1. Clone o repositório:
    ```sh
-   git clone https://github.com/seu-usuario/seu-repositorio.git
-   cd seu-repositorio
+   git clone https://github.com/jpeccia/lariharumi_croche_backend_go
+   cd lariharumi_croche_backend_go
    ```
 
 2. Instale as dependências:
@@ -32,17 +32,19 @@ Esta API é um sistema completo de gerenciamento de produtos e categorias com au
 3. Configure as variáveis de ambiente:
    Crie um arquivo `.env` na raiz do projeto e adicione:
    ```ini
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_USER=seu_usuario
-   DB_PASSWORD=sua_senha
-   DB_NAME=seu_banco
-   JWT_SECRET=sua_chave_secreta
+    JWT_SECRET=
+    DB_HOST=
+    DB_USER=
+    DB_PASSWORD=
+    DB_NAME=
+    DB_URL=
+    FRONTEND_URL=
+    BASEURL=
    ```
 
-4. Execute as migrações do banco de dados:
+4. Rode seu docker para criar o banco de dados:
    ```sh
-   go run main.go migrate
+   docker-compose up -d
    ```
 
 ---
@@ -97,13 +99,13 @@ Para gerar um token, faça login na API enviando um `POST` para `/login` com cre
 Crie um arquivo `Makefile` na raiz do projeto para automatizar tarefas comuns:
 
 ```make
-.PHONY: run test migrate fmt build
+.PHONY: run test docker fmt build
 
 run:
 	air
 
-migrate:
-	go run main.go migrate
+docker:
+	docker-compose up -d
 
 test:
 	go test ./...
@@ -117,7 +119,7 @@ build:
 
 Agora você pode rodar comandos como:
 - `make run` → Executa a API com live reload
-- `make migrate` → Executa as migrações do banco
+- `make docker` → Executa as migrações do banco
 - `make test` → Roda os testes
 - `make fmt` → Formata o código
 - `make build` → Compila o binário da aplicação
