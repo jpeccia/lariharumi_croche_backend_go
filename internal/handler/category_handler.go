@@ -82,8 +82,9 @@ func GetCategoryImage(c *gin.Context) {
 		return
 	}
 
-	// Aqui você gera a URL completa para a imagem
-	imageURL := fmt.Sprintf("http://localhost:8080%s", image)
+	// Gera a URL completa para a imagem usando BASEURL
+	BASEURL := os.Getenv("BASEURL")
+	imageURL := fmt.Sprintf("%s%s", BASEURL, image)
 	c.JSON(http.StatusOK, gin.H{"imageUrl": imageURL})
 }
 
@@ -115,14 +116,18 @@ func UploadCategoryImage(c *gin.Context) {
 		return
 	}
 
-	// Atualiza a categoria com a nova imagem (salva o caminho relativo no banco de dados, por exemplo)
+	// Atualiza a categoria com a nova imagem (salva o caminho relativo no banco de dados)
 	if err := service.AddCategoryImage(uint(categoryID), relativePath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar categoria com imagem: " + err.Error()})
 		return
 	}
+
+	// Retorna a URL completa da imagem usando BASEURL
+	BASEURL := os.Getenv("BASEURL")
+	imageURL := fmt.Sprintf("%s%s", BASEURL, relativePath)
 	c.JSON(http.StatusOK, gin.H{
 		"message":  "Imagem enviada com sucesso!",
-		"imageUrl": "http://localhost:8080/uploads/categories/" + filename, // Remover o caminho redundante
+		"imageUrl": imageURL,
 	})
 }
 
@@ -164,6 +169,7 @@ func DeleteCategoryImage(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Imagem da categoria deletada com sucesso!"})
 }
+
 // UpdateCategory atualiza os dados de uma categoria existente (exige token de admin)
 func UpdateCategory(c *gin.Context) {
 	// Obtém o ID da categoria da URL
