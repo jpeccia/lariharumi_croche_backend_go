@@ -16,7 +16,7 @@ func CORSMiddleware() gin.HandlerFunc {
 
 	config := cors.Config{
 		AllowOrigins:     []string{frontendURL}, // Permite requisições da URL do frontend
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Requested-With"},
 		AllowCredentials: true, // Permite cookies ou credenciais nas requisições
 	}

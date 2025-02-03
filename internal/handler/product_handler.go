@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
+	"github.com/jpeccia/lariharumi_croche_backend_go/internal/repository"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/service"
 )
 
@@ -106,6 +107,13 @@ func UpdateProduct(c *gin.Context) {
 		return
 	}
 
+	// Busca o produto existente no banco de dados
+	existingProduct, err := repository.GetProductByID(uint(productID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Produto não encontrado"})
+		return
+	}
+
 	// Recebe os dados atualizados para o produto
 	var req struct {
 		Name        string `json:"name"`
@@ -115,28 +123,32 @@ func UpdateProduct(c *gin.Context) {
 		CategoryID  uint   `json:"categoryId"`
 	}
 
-	// Valida os dados recebidos
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Cria o objeto de produto a ser atualizado
+	// Atualiza os campos necessários, mantendo a imagem anterior se o campo estiver vazio
 	product := model.Product{
 		Name:        req.Name,
 		Description: req.Description,
-		ImageUrls:   req.Image,
 		PriceRange:  req.Price,
 		CategoryID:  req.CategoryID,
 	}
 
-	// Chama o serviço de atualização (você pode criar essa função dentro do service)
+	// Se `image` for vazio, mantém a imagem anterior
+	if req.Image != "" {
+		product.ImageUrls = req.Image
+	} else {
+		product.ImageUrls = existingProduct.ImageUrls
+	}
+
+	// Chama o serviço de atualização
 	if err := service.UpdateProduct(uint(productID), &product); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar produto: " + err.Error()})
 		return
 	}
 
-	// Retorna o produto atualizado
 	c.JSON(http.StatusOK, product)
 }
 

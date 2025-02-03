@@ -40,8 +40,8 @@ func SetupRouter() *gin.Engine {
 	admin := r.Group("").Use(middleware.AuthMiddleware("ADMIN"))
 	{
 		admin.POST("/products", handler.CreateProduct)          // POST create product
-		admin.PUT("/products/:id", handler.UpdateProduct)       // UPDATE product
-		admin.PUT("/categories/:id", handler.UpdateCategory)       // UPDATE category
+		admin.PATCH("/products/:id", handler.UpdateProduct)     // UPDATE product
+		admin.PUT("/categories/:id", handler.UpdateCategory)    // UPDATE category
 		admin.DELETE("/products/:id", handler.DeleteProduct)    // DELETE product
 		admin.POST("/categories", handler.CreateCategory)       // POST create category
 		admin.DELETE("/categories/:id", handler.DeleteCategory) // DELETE category
