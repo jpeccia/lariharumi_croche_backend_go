@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -59,7 +60,6 @@ func DeleteProduct(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Produto deletado com sucesso!"})
 }
-
 
 // UploadProductImage realiza o upload de uma imagem para um produto
 func UploadProductImage(c *gin.Context) {
@@ -153,18 +153,22 @@ func GetProductsByCategory(c *gin.Context) {
 // GetProductImages retorna as imagens de um produto (público)
 func GetProductImages(c *gin.Context) {
 	productIDStr := c.Param("id")
+	log.Printf("Recebendo requisição para imagens do produto ID: %s", productIDStr)
+
 	productID, err := strconv.ParseUint(productIDStr, 10, 64)
 	if err != nil {
+		log.Println("ID do produto inválido")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID do produto inválido"})
 		return
 	}
 
 	images, err := service.GetProductImages(uint(productID))
 	if err != nil {
+		log.Printf("Erro ao obter imagens: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter imagens do produto: " + err.Error()})
 		return
 	}
 
+	log.Printf("Enviando imagens para o frontend: %v", images)
 	c.JSON(http.StatusOK, images)
 }
-

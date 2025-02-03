@@ -13,5 +13,4 @@ func main() {
 	r := router.SetupRouter()
 	log.Println("Servidor rodando na porta 8080....")
 	r.Run(":8080")
-	config.SetupCors(r)
 }

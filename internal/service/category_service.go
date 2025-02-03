@@ -68,3 +68,18 @@ func AddCategoryImage(categoryID uint, imagePath string) error {
 
 	return nil
 }
+
+func RemoveCategoryImage(categoryID uint) error {
+	category, err := repository.GetCategoryByID(categoryID)
+	if err != nil {
+		return err
+	}
+
+	// Atualiza o banco de dados para remover a imagem da categoria
+	category.Image = ""
+	if err := repository.UpdateCategory(category); err != nil {
+		return err
+	}
+
+	return nil
+}

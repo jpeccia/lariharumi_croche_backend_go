@@ -12,19 +12,28 @@ import (
 
 var jwtSecret = []byte(os.Getenv("JWT_SECRET")) // Segredo para assinar o token
 
+// Claims com Role adicional
+type CustomClaims struct {
+	jwt.RegisteredClaims
+	Role string `json:"role"`
+}
+
 // GenerateToken gera um token JWT para o usuário
 func GenerateToken(user *model.User) (string, error) {
-	// Define o tempo de expiração do token (1 hora)
+	// Verifica a role antes de gerar o token
+	fmt.Println("Gerando token para usuário com role:", user.Role)
+
 	expirationTime := time.Now().Add(1 * time.Hour)
 
-	// Criação do token
-	claims := &jwt.RegisteredClaims{
-		Subject:   fmt.Sprintf("%d", user.ID), // Converte o ID para string
-		ExpiresAt: jwt.NewNumericDate(expirationTime),
-		Issuer:    "laribackend", // Emissor do token
+	claims := &CustomClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   fmt.Sprintf("%d", user.ID),
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			Issuer:    "laribackend",
+		},
+		Role: string(user.Role), // Converte explicitamente para string
 	}
 
-	// Criação do token com a chave secreta
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(jwtSecret)
 	if err != nil {
@@ -35,26 +44,27 @@ func GenerateToken(user *model.User) (string, error) {
 }
 
 // ParseToken valida o token e retorna o ID do usuário
-func ParseToken(tokenString string) (uint, error) {
+func ParseToken(tokenString string) (uint, string, error) {
 	// Parseia o token
-	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return jwtSecret, nil
 	})
 	if err != nil || !token.Valid {
-		return 0, err
+		return 0, "", err
 	}
 
-	// Extrai os claims (dados do usuário)
-	claims, ok := token.Claims.(*jwt.RegisteredClaims)
+	// Extrai os claims personalizados (com role)
+	claims, ok := token.Claims.(*CustomClaims)
 	if !ok {
-		return 0, fmt.Errorf("não foi possível converter os claims")
+		return 0, "", fmt.Errorf("não foi possível converter os claims")
 	}
 
 	// Converte o Subject (string) para uint
 	id, err := strconv.ParseUint(claims.Subject, 10, 64)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 
-	return uint(id), nil
+	// Retorna o ID do usuário e a role
+	return uint(id), claims.Role, nil
 }

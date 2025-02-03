@@ -2,20 +2,24 @@ package config
 
 import (
 	"os"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
-// Configura o CORS para a aplicação
-func SetupCors(r *gin.Engine) {
-	// Obtém a URL do front-end do arquivo .env
-	frontEndURL := os.Getenv("FRONTEND_URL")
+// CORSMiddleware configura o middleware de CORS
+func CORSMiddleware() gin.HandlerFunc {
+	frontendURL := os.Getenv("FRONTEND_URL") // Certifique-se de que FRONTEND_URL está definido no seu .env
+	if frontendURL == "" {
+		frontendURL = "http://localhost:5173" // Use o valor padrão se não estiver no .env
+	}
 
-	// Configuração do CORS
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{frontEndURL},    // URL do Front-end a partir do .env
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},  // Métodos permitidos
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"}, // Cabeçalhos permitidos
-		AllowCredentials: true,  // Permite enviar cookies e credenciais
-	}))
+	config := cors.Config{
+		AllowOrigins:     []string{frontendURL}, // Permite requisições da URL do frontend
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Requested-With"},
+		AllowCredentials: true, // Permite cookies ou credenciais nas requisições
+	}
+
+	return cors.New(config)
 }

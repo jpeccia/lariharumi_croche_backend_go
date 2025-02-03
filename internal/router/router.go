@@ -2,12 +2,18 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/jpeccia/lariharumi_croche_backend_go/config"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/handler"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/middleware"
 )
 
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
+
+	r.Static("/uploads", "./uploads")
+
+	// Aplica o middleware de CORS globalmente
+	r.Use(config.CORSMiddleware())
 
 	// Grupo de autenticação
 	auth := r.Group("/auth")
@@ -17,17 +23,17 @@ func SetupRouter() *gin.Engine {
 	}
 
 	// Grupo público, sem autenticação
+	categories := r.Group("/categories")
+	{
+		categories.GET("", handler.GetCategories) // Rota sem a barra final
+		categories.GET("/:id/image", handler.GetCategoryImage)
+	}
+
 	products := r.Group("/products")
 	{
 		products.GET("/category/:id", handler.GetProductsByCategory) // Rota para obter produtos por categoria
-		products.GET("/", handler.GetProducts)                       // GET products
+		products.GET("", handler.GetProducts)                        // GET products sem barra final
 		products.GET("/:id/images", handler.GetProductImages)        // GET product images
-	}
-
-	categories := r.Group("/categories")
-	{
-		categories.GET("/", handler.GetCategories)             // GET categories
-		categories.GET("/:id/image", handler.GetCategoryImage) // GET category image
 	}
 
 	// Rota protegida para admin (somente para admin)
@@ -40,6 +46,8 @@ func SetupRouter() *gin.Engine {
 		// Rotas para upload de imagem
 		admin.POST("/products/:id/upload-image", handler.UploadProductImage)
 		admin.POST("/categories/:id/upload-image", handler.UploadCategoryImage)
+		admin.DELETE("/products/:id/images/:index", handler.DeleteProductImage)
+		admin.DELETE("/categories/:id/image", handler.DeleteCategoryImage)
 	}
 
 	return r

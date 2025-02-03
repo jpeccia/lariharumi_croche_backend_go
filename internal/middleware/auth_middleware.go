@@ -4,8 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
-	"github.com/jpeccia/lariharumi_croche_backend_go/internal/repository"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/util"
 )
 
@@ -25,30 +23,22 @@ func AuthMiddleware(roleRequired string) gin.HandlerFunc {
 			token = token[7:]
 		}
 
-		// Valida o token e extrai o userID
-		userID, err := util.ParseToken(token)
+		// Valida o token e extrai o userID e role
+		userID, role, err := util.ParseToken(token) // Agora captura a role também
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token inválido"})
 			c.Abort()
 			return
 		}
 
-		// Busca o usuário no banco de dados com base no userID
-		user, err := repository.GetUserByID(userID)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Usuário não encontrado"})
-			c.Abort()
-			return
-		}
-
 		// Verifica se o usuário tem a role correta
-		if roleRequired != "" && user.Role != model.AdminRole {
+		if roleRequired != "" && role != roleRequired { // Verifica a role extraída do token
 			c.JSON(http.StatusForbidden, gin.H{"error": "Acesso negado: permissões insuficientes"})
 			c.Abort()
 			return
 		}
 
-		// Adiciona o usuário ao contexto para outras operações
+		// Adiciona o userID ao contexto para outras operações
 		c.Set("userID", userID)
 
 		// Continua a execução
