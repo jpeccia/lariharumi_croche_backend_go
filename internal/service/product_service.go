@@ -123,3 +123,25 @@ func DeleteProduct(productID uint) error {
 
 	return nil
 }
+// UpdateProduct no serviço
+func UpdateProduct(productID uint, updatedProduct *model.Product) error {
+	// Primeiro, tenta buscar o produto pelo ID
+	product, err := repository.GetProductByID(productID)
+	if err != nil {
+		return err // Retorna erro se não encontrar o produto
+	}
+
+	// Atualiza os campos do produto
+	product.Name = updatedProduct.Name
+	product.Description = updatedProduct.Description
+	product.ImageUrls = updatedProduct.ImageUrls
+	product.PriceRange = updatedProduct.PriceRange
+	product.CategoryID = updatedProduct.CategoryID
+
+	// Atualiza o produto no banco de dados
+	if err := repository.UpdateProduct(product); err != nil {
+		return err // Retorna erro se falhar ao atualizar no banco
+	}
+
+	return nil
+}

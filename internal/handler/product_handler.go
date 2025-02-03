@@ -96,6 +96,50 @@ func UploadProductImage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Imagem enviada com sucesso!", "path": uploadPath})
 }
 
+// UpdateProduct atualiza as informações de um produto existente (exige token de admin)
+func UpdateProduct(c *gin.Context) {
+	// Obtém o ID do produto a ser atualizado
+	productIDStr := c.Param("id")
+	productID, err := strconv.ParseUint(productIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID do produto inválido"})
+		return
+	}
+
+	// Recebe os dados atualizados para o produto
+	var req struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Image       string `json:"image"`
+		Price       string `json:"price"`
+		CategoryID  uint   `json:"categoryId"`
+	}
+
+	// Valida os dados recebidos
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Cria o objeto de produto a ser atualizado
+	product := model.Product{
+		Name:        req.Name,
+		Description: req.Description,
+		ImageUrls:   req.Image,
+		PriceRange:  req.Price,
+		CategoryID:  req.CategoryID,
+	}
+
+	// Chama o serviço de atualização (você pode criar essa função dentro do service)
+	if err := service.UpdateProduct(uint(productID), &product); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar produto: " + err.Error()})
+		return
+	}
+
+	// Retorna o produto atualizado
+	c.JSON(http.StatusOK, product)
+}
+
 // DeleteProductImage remove uma imagem do produto. O endpoint é definido como /products/:id/images/:index
 func DeleteProductImage(c *gin.Context) {
 	productIDStr := c.Param("id")

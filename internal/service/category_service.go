@@ -83,3 +83,23 @@ func RemoveCategoryImage(categoryID uint) error {
 
 	return nil
 }
+
+// UpdateCategory atualiza os dados de uma categoria no banco de dados
+func UpdateCategory(categoryID uint, updatedCategory *model.Category) error {
+	// Busca a categoria existente no banco de dados
+	category, err := repository.GetCategoryByID(categoryID)
+	if err != nil {
+		return err // Retorna erro se não encontrar o produto
+	}
+	// Atualiza os campos da categoria
+	category.Name = updatedCategory.Name
+	category.Description = updatedCategory.Description
+	category.Image = updatedCategory.Image
+
+	// Salva as alterações no banco de dados
+	if err := repository.UpdateCategory(category); err != nil {
+		return err // Retorna erro se falhar ao atualizar no banco
+	}
+
+	return nil
+}

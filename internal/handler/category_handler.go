@@ -164,3 +164,42 @@ func DeleteCategoryImage(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Imagem da categoria deletada com sucesso!"})
 }
+// UpdateCategory atualiza os dados de uma categoria existente (exige token de admin)
+func UpdateCategory(c *gin.Context) {
+	// Obtém o ID da categoria da URL
+	categoryIDStr := c.Param("id")
+	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID da categoria inválido"})
+		return
+	}
+
+	// Define a estrutura de dados para atualizar a categoria
+	var req struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Image       string `json:"image"`
+	}
+
+	// Valida os dados recebidos
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Cria a categoria com os dados recebidos
+	updatedCategory := model.Category{
+		Name:        req.Name,
+		Description: req.Description,
+		Image:       req.Image,
+	}
+
+	// Chama o serviço para atualizar a categoria no banco de dados
+	if err := service.UpdateCategory(uint(categoryID), &updatedCategory); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar categoria: " + err.Error()})
+		return
+	}
+
+	// Retorna a categoria atualizada
+	c.JSON(http.StatusOK, updatedCategory)
+}
