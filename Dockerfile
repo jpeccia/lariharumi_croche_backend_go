@@ -1,5 +1,5 @@
-# Usa uma imagem base oficial do Golang para construir o app
-FROM golang:1.21 AS builder
+# Usando uma versão mais recente do Go
+FROM golang:1.23 AS builder
 
 # Define o diretório de trabalho dentro do container
 WORKDIR /app
