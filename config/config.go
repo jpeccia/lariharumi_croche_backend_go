@@ -14,9 +14,13 @@ import (
 var DB *gorm.DB
 
 func LoadEnv() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Erro ao carregar .env")
+	if _, err := os.Stat(".env"); err == nil {
+		err := godotenv.Load()
+		if err != nil {
+			log.Println("Aviso: Não foi possível carregar o .env, mas o sistema continuará usando variáveis do ambiente.")
+		}
+	} else {
+		log.Println("Executando sem .env, utilizando variáveis do ambiente.")
 	}
 }
 
