@@ -14,7 +14,7 @@ func CORSMiddleware() gin.HandlerFunc {
 	log.Println("CORS AllowOrigins:", frontendURL)
 
 	config := cors.Config{
-		AllowAllOrigins:  true, // Permite todas as origens para testes
+		AllowOrigins:     []string{frontendURL},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Requested-With"},
 		AllowCredentials: true,
