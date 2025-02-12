@@ -62,9 +62,7 @@ func DeleteProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Produto deletado com sucesso!"})
 }
 
-// UploadProductImage realiza o upload de uma imagem para um produto
-func UploadProductImage(c *gin.Context) {
-	// Obtém o id do produto da URL
+func UploadProductImages(c *gin.Context) {
 	productIDStr := c.Param("id")
 	productID, err := strconv.ParseUint(productIDStr, 10, 64)
 	if err != nil {
@@ -72,29 +70,38 @@ func UploadProductImage(c *gin.Context) {
 		return
 	}
 
-	// Obtém o arquivo do formulário multipart
-	file, err := c.FormFile("image")
+	form, err := c.MultipartForm()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Imagem não encontrada: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Erro ao processar o formulário: " + err.Error()})
 		return
 	}
 
-	// Define um caminho para salvar a imagem (ajuste conforme sua necessidade)
-	filename := filepath.Base(file.Filename)
-	uploadPath := "./uploads/products/" + filename
-
-	if err := c.SaveUploadedFile(file, uploadPath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar a imagem: " + err.Error()})
+	files := form.File["images[]"] 
+	if len(files) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Nenhuma imagem enviada"})
 		return
 	}
 
-	// Atualiza o produto com a nova imagem. Aqui, você pode chamar uma função no service.
-	if err := service.AddProductImage(uint(productID), uploadPath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar produto com imagem: " + err.Error()})
-		return
+	var uploadedPaths []string
+
+	for _, file := range files {
+		filename := filepath.Base(file.Filename)
+		uploadPath := "./uploads/products/" + filename
+
+		if err := c.SaveUploadedFile(file, uploadPath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar a imagem: " + err.Error()})
+			return
+		}
+
+		if err := service.AddProductImage(uint(productID), uploadPath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar produto com imagem: " + err.Error()})
+			return
+		}
+
+		uploadedPaths = append(uploadedPaths, uploadPath)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Imagem enviada com sucesso!", "path": uploadPath})
+	c.JSON(http.StatusOK, gin.H{"message": "Imagens enviadas com sucesso!", "paths": uploadedPaths})
 }
 
 // UpdateProduct atualiza as informações de um produto existente (exige token de admin)
