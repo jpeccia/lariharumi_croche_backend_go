@@ -123,6 +123,7 @@ func DeleteProduct(productID uint) error {
 
 	return nil
 }
+
 // UpdateProduct no serviço
 func UpdateProduct(productID uint, updatedProduct *model.Product) error {
 	// Primeiro, tenta buscar o produto pelo ID

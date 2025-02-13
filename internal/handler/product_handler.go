@@ -62,6 +62,7 @@ func DeleteProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Produto deletado com sucesso!"})
 }
 
+// UploadProductImage realiza o upload de uma imagem para um produto
 func UploadProductImages(c *gin.Context) {
 	productIDStr := c.Param("id")
 	productID, err := strconv.ParseUint(productIDStr, 10, 64)
@@ -76,7 +77,7 @@ func UploadProductImages(c *gin.Context) {
 		return
 	}
 
-	files := form.File["images[]"] 
+	files := form.File["images[]"]
 	if len(files) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Nenhuma imagem enviada"})
 		return

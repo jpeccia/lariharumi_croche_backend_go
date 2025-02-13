@@ -45,7 +45,7 @@ func SetupRouter() *gin.Engine {
 		admin.DELETE("/products/:id", handler.DeleteProduct)
 		admin.POST("/categories", handler.CreateCategory)
 		admin.DELETE("/categories/:id", handler.DeleteCategory)
-		admin.POST("/products/:id/upload-image", handler.UploadProductImages)
+		admin.POST("/products/:id/upload-images", handler.UploadProductImages)
 		admin.POST("/categories/:id/upload-image", handler.UploadCategoryImage)
 		admin.DELETE("/products/:id/images/:index", handler.DeleteProductImage)
 		admin.DELETE("/categories/:id/image", handler.DeleteCategoryImage)
