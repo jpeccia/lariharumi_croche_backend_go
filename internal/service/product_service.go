@@ -72,8 +72,8 @@ func DeleteProductImage(productID uint, index int) error {
 }
 
 // GetProducts retorna todos os produtos
-func GetProducts(limit, offset int) ([]model.Product, error) {
-	products, err := repository.GetProducts(limit, offset)
+func GetProducts() ([]model.Product, error) {
+	products, err := repository.GetProducts()
 	if err != nil {
 		return nil, err
 	}

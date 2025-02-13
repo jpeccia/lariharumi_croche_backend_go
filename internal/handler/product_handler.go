@@ -187,24 +187,7 @@ func DeleteProductImage(c *gin.Context) {
 
 // GetProducts retorna todos os produtos (público)
 func GetProducts(c *gin.Context) {
-	// Pegando parâmetros de paginação da query string
-	limitStr := c.DefaultQuery("limit", "5")  // Limite padrão de 5 produtos por requisição
-	offsetStr := c.DefaultQuery("offset", "0")
-
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil || limit <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Parâmetro 'limit' inválido"})
-		return
-	}
-
-	offset, err := strconv.Atoi(offsetStr)
-	if err != nil || offset < 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Parâmetro 'offset' inválido"})
-		return
-	}
-
-	// Chamando o serviço para buscar produtos paginados
-	products, err := service.GetProducts(limit, offset)
+	products, err := service.GetProducts()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter produtos: " + err.Error()})
 		return
