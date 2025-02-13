@@ -29,9 +29,10 @@ func GetProductByID(productID uint) (*model.Product, error) {
 }
 
 // GetProducts retorna todos os produtos
-func GetProducts() ([]model.Product, error) {
+func GetProducts(limit, offset int) ([]model.Product, error) {
 	var products []model.Product
-	if err := config.DB.Find(&products).Error; err != nil {
+	err := config.DB.Limit(limit).Offset(offset).Find(&products).Error
+	if err != nil {
 		return nil, err
 	}
 	return products, nil
