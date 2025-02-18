@@ -18,6 +18,8 @@ services:
       BASEURL: ${BASEURL}
     depends_on:
       - db
+    volumes:
+      - ./uploads:/root/uploads
 
   db:
     image: postgres:13
