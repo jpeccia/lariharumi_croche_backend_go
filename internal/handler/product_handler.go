@@ -1,16 +1,25 @@
 package handler
 
 import (
-	"log"
+	"fmt"
 	"net/http"
-	"path/filepath"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/repository"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/service"
+	storage "github.com/supabase-community/storage-go"
 )
+
+func getSupabaseClient() *storage.Client {
+	supabaseURL := os.Getenv("SUPABASE_URL")
+	apiKey := os.Getenv("SUPABASE_SERVICE_ROLE_KEY")
+	client := storage.NewClient(supabaseURL+"/storage/v1", apiKey, nil)
+	return client
+}
 
 // CreateProduct cria um novo produto (exige token de admin)
 func CreateProduct(c *gin.Context) {
@@ -71,38 +80,58 @@ func UploadProductImages(c *gin.Context) {
 		return
 	}
 
+	// Processa o formulário multipart
 	form, err := c.MultipartForm()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Erro ao processar o formulário: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Erro ao processar o formulário"})
 		return
 	}
 
+	// Verifica se há imagens enviadas
 	files := form.File["images[]"]
 	if len(files) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Nenhuma imagem enviada"})
 		return
 	}
 
+	// Configura o cliente do Supabase
+	client := getSupabaseClient()
+	bucketName := "product-images"
+
 	var uploadedPaths []string
-
 	for _, file := range files {
-		filename := filepath.Base(file.Filename)
-		uploadPath := "./uploads/products/" + filename
-
-		if err := c.SaveUploadedFile(file, uploadPath); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar a imagem: " + err.Error()})
+		// Verifica o tipo de arquivo (apenas imagens)
+		if !strings.HasPrefix(file.Header.Get("Content-Type"), "image/") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Arquivo não é uma imagem"})
 			return
 		}
 
-		if err := service.AddProductImage(uint(productID), uploadPath); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar produto com imagem: " + err.Error()})
+		// Cria um nome único para o arquivo
+		newFileName := fmt.Sprintf("product_%d_%s", productID, file.Filename)
+		uploadPath := fmt.Sprintf("products/%s", newFileName)
+
+		// Abre o arquivo para o upload
+		src, err := file.Open()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao abrir o arquivo"})
+			return
+		}
+		defer src.Close()
+
+		// Faz o upload para o Supabase
+		_, err = client.UploadFile(bucketName, uploadPath, src)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao enviar para o Supabase: " + err.Error()})
 			return
 		}
 
-		uploadedPaths = append(uploadedPaths, uploadPath)
+		// Gera a URL pública da imagem
+		imageURL := fmt.Sprintf("%s/storage/v1/object/public/%s/%s", os.Getenv("SUPABASE_URL"), bucketName, uploadPath)
+		uploadedPaths = append(uploadedPaths, imageURL)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Imagens enviadas com sucesso!", "paths": uploadedPaths})
+	// Retorna as URLs das imagens enviadas
+	c.JSON(http.StatusOK, gin.H{"message": "Imagens enviadas!", "paths": uploadedPaths})
 }
 
 // UpdateProduct atualiza as informações de um produto existente (exige token de admin)
@@ -160,23 +189,25 @@ func UpdateProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
-// DeleteProductImage remove uma imagem do produto. O endpoint é definido como /products/:id/images/:index
 func DeleteProductImage(c *gin.Context) {
 	productIDStr := c.Param("id")
 	indexStr := c.Param("index")
 
+	// Conversão do ID do produto para uint
 	productID, err := strconv.ParseUint(productIDStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID do produto inválido"})
 		return
 	}
 
+	// Conversão do índice para o tipo int
 	index, err := strconv.Atoi(indexStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Index inválido"})
 		return
 	}
 
+	// Chama a função de exclusão com o índice
 	if err := service.DeleteProductImage(uint(productID), index); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao deletar imagem: " + err.Error()})
 		return
@@ -217,22 +248,18 @@ func GetProductsByCategory(c *gin.Context) {
 // GetProductImages retorna as imagens de um produto (público)
 func GetProductImages(c *gin.Context) {
 	productIDStr := c.Param("id")
-	log.Printf("Recebendo requisição para imagens do produto ID: %s", productIDStr)
-
 	productID, err := strconv.ParseUint(productIDStr, 10, 64)
 	if err != nil {
-		log.Println("ID do produto inválido")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID do produto inválido"})
 		return
 	}
 
+	// Busca imagens no banco de dados
 	images, err := service.GetProductImages(uint(productID))
 	if err != nil {
-		log.Printf("Erro ao obter imagens: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter imagens do produto: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter imagens do produto"})
 		return
 	}
 
-	log.Printf("Enviando imagens para o frontend: %v", images)
 	c.JSON(http.StatusOK, images)
 }

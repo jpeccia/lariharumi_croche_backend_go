@@ -7,9 +7,9 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
+	storage "github.com/supabase-community/storage-go"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	storage "github.com/supabase-community/storage-go"
 )
 
 var DB *gorm.DB
@@ -49,8 +49,7 @@ func ConnectDB() {
 	MigrateDB(DB)
 }
 
-
-func initSupabase() *storage.Client {
+func getSupabaseClient() *storage.Client {
 	supabaseURL := os.Getenv("SUPABASE_URL")
 	apiKey := os.Getenv("SUPABASE_SERVICE_ROLE_KEY")
 	client := storage.NewClient(supabaseURL+"/storage/v1", apiKey, nil)
