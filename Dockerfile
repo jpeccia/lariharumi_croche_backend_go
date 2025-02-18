@@ -1,8 +1,6 @@
 # Usando uma versão mais recente do Go
 FROM golang:1.23 AS builder
 
-RUN apt-get update && apt-get install -y ca-certificates
-COPY ./certs/* /etc/ssl/certs/
 # Define o diretório de trabalho dentro do container
 WORKDIR /app
 
@@ -18,6 +16,19 @@ RUN go build -o main .
 
 # Usa uma imagem mínima para rodar o binário gerado
 FROM debian:bookworm-slim
+
+# Instala pacotes necessários, incluindo o OpenSSL e o ca-certificates
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copia o certificado da autoridade confiável para o container
+COPY Zscaler.crt /usr/local/share/ca-certificates/Zscaler.crt
+
+# Atualiza os certificados de autoridade no container
+RUN update-ca-certificates --fresh
 
 # Define o diretório de trabalho no runtime
 WORKDIR /root/
