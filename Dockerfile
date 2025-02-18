@@ -24,8 +24,6 @@ RUN apt-get update && apt-get install -y \
     openssl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copia o certificado da autoridade confiável para o container
-COPY Zscaler.crt /usr/local/share/ca-certificates/Zscaler.crt
 
 # Atualiza os certificados de autoridade no container
 RUN update-ca-certificates --fresh
