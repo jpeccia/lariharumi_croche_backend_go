@@ -3,8 +3,6 @@ FROM golang:1.23 AS builder
 
 RUN apt-get update && apt-get install -y ca-certificates
 COPY ./certs/* /etc/ssl/certs/
-COPY ca-bundle.crt /etc/ssl/certs/ca-bundle.crt
-COPY ca-bundle.trust.crt /etc/ssl/certs/ca-bundle.trust.crt
 # Define o diretório de trabalho dentro do container
 WORKDIR /app
 
