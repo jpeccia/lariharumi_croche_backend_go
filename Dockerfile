@@ -1,6 +1,8 @@
 # Usando uma versão mais recente do Go
 FROM golang:1.23 AS builder
 
+RUN apt-get update && apt-get install -y ca-certificates
+
 # Define o diretório de trabalho dentro do container
 WORKDIR /app
 
