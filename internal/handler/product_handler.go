@@ -3,16 +3,17 @@ package handler
 import (
 	"log"
 	"net/http"
-	"path/filepath"
+	"os"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-resty/resty/v2"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/repository"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/service"
+	"github.com/tidwall/gjson"
 )
 
-// CreateProduct cria um novo produto (exige token de admin)
 func CreateProduct(c *gin.Context) {
 	var req struct {
 		Name        string `json:"name"`
@@ -43,9 +44,7 @@ func CreateProduct(c *gin.Context) {
 	c.JSON(http.StatusCreated, product)
 }
 
-// DeleteProduct deleta um produto pelo ID (exige token de admin)
 func DeleteProduct(c *gin.Context) {
-	// Obtém o id do produto da URL
 	productIDStr := c.Param("id")
 	productID, err := strconv.ParseUint(productIDStr, 10, 64)
 	if err != nil {
@@ -53,7 +52,6 @@ func DeleteProduct(c *gin.Context) {
 		return
 	}
 
-	// Chama o serviço para deletar o produto
 	if err := service.DeleteProduct(uint(productID)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao deletar produto: " + err.Error()})
 		return
@@ -62,7 +60,13 @@ func DeleteProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Produto deletado com sucesso!"})
 }
 
-// UploadProductImage realiza o upload de uma imagem para um produto
+type ImgBBResponse struct {
+	Data struct {
+		URL string `json:"url"`
+	} `json:"data"`
+	Success bool `json:"success"`
+}
+
 func UploadProductImages(c *gin.Context) {
 	productIDStr := c.Param("id")
 	productID, err := strconv.ParseUint(productIDStr, 10, 64)
@@ -83,31 +87,54 @@ func UploadProductImages(c *gin.Context) {
 		return
 	}
 
-	var uploadedPaths []string
+	apiKey := os.Getenv("IMGBB_API_KEY")
+	if apiKey == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Chave da API ImgBB não encontrada"})
+		return
+	}
+
+	client := resty.New()
+	var uploadedUrls []string
 
 	for _, file := range files {
-		filename := filepath.Base(file.Filename)
-		uploadPath := "./uploads/products/" + filename
+		// Abrindo a imagem
+		src, err := file.Open()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao abrir imagem: " + err.Error()})
+			return
+		}
+		defer src.Close()
 
-		if err := c.SaveUploadedFile(file, uploadPath); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar a imagem: " + err.Error()})
+		// Enviando para o ImgBB
+		resp, err := client.R().
+			SetFileReader("image", file.Filename, src).
+			SetFormData(map[string]string{"key": apiKey}).
+			Post("https://api.imgbb.com/1/upload")
+
+		if err != nil || resp.StatusCode() != http.StatusOK {
+			log.Println("Erro no upload para ImgBB:", err, "Resposta:", resp.String())
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao fazer upload no ImgBB"})
 			return
 		}
 
-		if err := service.AddProductImage(uint(productID), uploadPath); err != nil {
+		// Extraindo URL da resposta
+		url := gjson.Get(resp.String(), "data.url").String()
+		uploadedUrls = append(uploadedUrls, url)
+
+		// Salvando a URL no banco de dados
+		if err := service.AddProductImage(uint(productID), url); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar produto com imagem: " + err.Error()})
 			return
 		}
-
-		uploadedPaths = append(uploadedPaths, uploadPath)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Imagens enviadas com sucesso!", "paths": uploadedPaths})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Imagens enviadas com sucesso!",
+		"paths":   uploadedUrls,
+	})
 }
 
-// UpdateProduct atualiza as informações de um produto existente (exige token de admin)
 func UpdateProduct(c *gin.Context) {
-	// Obtém o ID do produto a ser atualizado
 	productIDStr := c.Param("id")
 	productID, err := strconv.ParseUint(productIDStr, 10, 64)
 	if err != nil {
@@ -115,14 +142,12 @@ func UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	// Busca o produto existente no banco de dados
 	existingProduct, err := repository.GetProductByID(uint(productID))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Produto não encontrado"})
 		return
 	}
 
-	// Recebe os dados atualizados para o produto
 	var req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
@@ -136,7 +161,6 @@ func UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	// Atualiza os campos necessários, mantendo a imagem anterior se o campo estiver vazio
 	product := model.Product{
 		Name:        req.Name,
 		Description: req.Description,
@@ -144,14 +168,12 @@ func UpdateProduct(c *gin.Context) {
 		CategoryID:  req.CategoryID,
 	}
 
-	// Se `image` for vazio, mantém a imagem anterior
 	if req.Image != "" {
 		product.ImageUrls = req.Image
 	} else {
 		product.ImageUrls = existingProduct.ImageUrls
 	}
 
-	// Chama o serviço de atualização
 	if err := service.UpdateProduct(uint(productID), &product); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar produto: " + err.Error()})
 		return
@@ -160,7 +182,6 @@ func UpdateProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
-// DeleteProductImage remove uma imagem do produto. O endpoint é definido como /products/:id/images/:index
 func DeleteProductImage(c *gin.Context) {
 	productIDStr := c.Param("id")
 	indexStr := c.Param("index")
@@ -185,7 +206,6 @@ func DeleteProductImage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Imagem deletada com sucesso!"})
 }
 
-// GetProducts retorna todos os produtos (público)
 func GetProducts(c *gin.Context) {
 	products, err := service.GetProducts()
 	if err != nil {
@@ -196,7 +216,6 @@ func GetProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, products)
 }
 
-// GetProductsByCategory retorna os produtos filtrados por categoria (público)
 func GetProductsByCategory(c *gin.Context) {
 	categoryIDStr := c.Param("id")
 	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 64)
@@ -214,7 +233,6 @@ func GetProductsByCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, products)
 }
 
-// GetProductImages retorna as imagens de um produto (público)
 func GetProductImages(c *gin.Context) {
 	productIDStr := c.Param("id")
 	log.Printf("Recebendo requisição para imagens do produto ID: %s", productIDStr)

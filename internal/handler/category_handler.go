@@ -1,17 +1,19 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/service"
 )
-
 
 // CreateCategory cria uma nova categoria (exige token de admin)
 func CreateCategory(c *gin.Context) {
@@ -68,7 +70,6 @@ func GetCategories(c *gin.Context) {
 	c.JSON(http.StatusOK, categories)
 }
 
-// GetCategoryImage retorna a imagem de uma categoria (público)
 func GetCategoryImage(c *gin.Context) {
 	categoryIDStr := c.Param("id")
 	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 64)
@@ -77,21 +78,23 @@ func GetCategoryImage(c *gin.Context) {
 		return
 	}
 
-	image, err := service.GetCategoryImage(uint(categoryID))
+	imageURL, err := service.GetCategoryImage(uint(categoryID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter imagem da categoria: " + err.Error()})
 		return
 	}
 
-	// Gera a URL completa para a imagem usando BASEURL
-	BASEURL := os.Getenv("BASEURL")
-	imageURL := fmt.Sprintf("%s%s", BASEURL, image)
+	if imageURL == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Imagem não encontrada para essa categoria"})
+		return
+	}
+
+	// Retorna a URL pública da imagem no ImgBB
 	c.JSON(http.StatusOK, gin.H{"imageUrl": imageURL})
 }
 
-// UploadCategoryImage realiza o upload de uma imagem para uma categoria
+
 func UploadCategoryImage(c *gin.Context) {
-	// Obtém o id da categoria da URL
 	categoryIDStr := c.Param("id")
 	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 64)
 	if err != nil {
@@ -99,33 +102,79 @@ func UploadCategoryImage(c *gin.Context) {
 		return
 	}
 
-	// Obtém o arquivo do formulário multipart
 	file, err := c.FormFile("image")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Imagem não encontrada: " + err.Error()})
 		return
 	}
 
-	// Define o nome do arquivo e os caminhos para salvar e retornar
-	filename := filepath.Base(file.Filename)
-	localPath := "./uploads/categories/" + filename   // Caminho para salvar no sistema de arquivos
-	relativePath := "/uploads/categories/" + filename // Caminho relativo para a URL
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao abrir a imagem: " + err.Error()})
+		return
+	}
+	defer src.Close()
 
-	// Salva o arquivo no diretório local
-	if err := c.SaveUploadedFile(file, localPath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar a imagem: " + err.Error()})
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	part, err := writer.CreateFormFile("image", file.Filename)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar formulário para upload: " + err.Error()})
 		return
 	}
 
-	// Atualiza a categoria com a nova imagem (salva o caminho relativo no banco de dados)
-	if err := service.AddCategoryImage(uint(categoryID), relativePath); err != nil {
+	if _, err := io.Copy(part, src); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao copiar imagem: " + err.Error()})
+		return
+	}
+	writer.Close()
+
+	// Obtém a chave da API do ImgBB do .env
+	imgBBKey := os.Getenv("IMGBB_API_KEY")
+	if imgBBKey == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Chave da API ImgBB não encontrada"})
+		return
+	}
+
+	imgBBURL := fmt.Sprintf("https://api.imgbb.com/1/upload?key=%s", imgBBKey)
+	req, err := http.NewRequest("POST", imgBBURL, &buf)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar requisição para ImgBB: " + err.Error()})
+		return
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao enviar imagem para ImgBB: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	// Decodifica a resposta do ImgBB
+	var imgBBResp ImgBBResponse
+	if err := json.NewDecoder(resp.Body).Decode(&imgBBResp); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao processar resposta do ImgBB: " + err.Error()})
+		return
+	}
+
+	// Verifica se o upload foi bem-sucedido
+	if !imgBBResp.Success {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Upload para ImgBB falhou"})
+		return
+	}
+
+	// Obtém a URL da imagem no ImgBB
+	imageURL := imgBBResp.Data.URL
+
+	// Atualiza a categoria no banco de dados com a URL da imagem
+	if err := service.AddCategoryImage(uint(categoryID), imageURL); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar categoria com imagem: " + err.Error()})
 		return
 	}
 
-	// Retorna a URL completa da imagem usando BASEURL
-	BASEURL := os.Getenv("BASEURL")
-	imageURL := fmt.Sprintf("%s%s", BASEURL, relativePath)
+	// Retorna a URL da imagem para o frontend
 	c.JSON(http.StatusOK, gin.H{
 		"message":  "Imagem enviada com sucesso!",
 		"imageUrl": imageURL,
