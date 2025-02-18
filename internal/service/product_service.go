@@ -6,7 +6,6 @@ import (
 
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/repository"
-	
 )
 
 // CreateProduct cria um novo produto
@@ -25,34 +24,51 @@ func CreateProduct(product *model.Product) error {
 	return nil
 }
 
-var productImagesDB = map[uint][]string{}
-
 // AddProductImage adiciona um caminho de imagem ao produto
-func AddProductImage(productID uint, imageURL string) error {
-	if productID == 0 {
-		return errors.New("ID do produto inválido")
+func AddProductImage(productID uint, imagePath string) error {
+	// Buscar o produto pelo ID (opcional, para verificar se existe)
+	product, err := repository.GetProductByID(productID)
+	if err != nil {
+		return err
+	}
+	if product == nil {
+		return errors.New("produto não encontrado")
 	}
 
-	productImagesDB[productID] = append(productImagesDB[productID], imageURL)
-	return nil
+	// Aqui supomos que o campo ImageUrls é uma string que armazena os caminhos separados por vírgula.
+	// Em uma implementação real, pode ser um array ou uma tabela associada.
+	if product.ImageUrls != "" {
+		product.ImageUrls = product.ImageUrls + "," + imagePath
+	} else {
+		product.ImageUrls = imagePath
+	}
+
+	// Atualiza o produto com o novo caminho de imagem.
+	return repository.UpdateProduct(product)
 }
 
+// DeleteProductImage remove uma imagem do produto dado seu índice (posição na lista)
 func DeleteProductImage(productID uint, index int) error {
-	images, exists := productImagesDB[productID]
-	if !exists {
-		return fmt.Errorf("Produto %d não encontrado", productID)
+	product, err := repository.GetProductByID(productID)
+	if err != nil {
+		return err
+	}
+	if product == nil {
+		return errors.New("produto não encontrado")
 	}
 
-	// Verifica se o índice é válido
-	if index < 0 || index >= len(images) {
-		return fmt.Errorf("Índice inválido")
+	// Supondo que as imagens estejam armazenadas como string separada por vírgula.
+	imagePaths := repository.ParseImageUrls(product.ImageUrls)
+	if index < 0 || index >= len(imagePaths) {
+		return errors.New("índice de imagem inválido")
 	}
 
-	// Remove a imagem com base no índice
-	images = append(images[:index], images[index+1:]...)
+	// Remove a imagem do slice
+	imagePaths = append(imagePaths[:index], imagePaths[index+1:]...)
+	// Atualiza o campo ImageUrls
+	product.ImageUrls = repository.JoinImageUrls(imagePaths)
 
-	productImagesDB[productID] = images
-	return nil
+	return repository.UpdateProduct(product)
 }
 
 // GetProducts retorna todos os produtos
@@ -73,12 +89,18 @@ func GetProductsByCategory(categoryID uint) ([]model.Product, error) {
 	return products, nil
 }
 
+// GetProductImages retorna as imagens de um produto
+// Se o campo ImageUrls for uma string separada por vírgula, podemos utilizar essa lógica para transformá-la em slice.
 func GetProductImages(productID uint) ([]string, error) {
-	images, exists := productImagesDB[productID]
-	if !exists {
-		return nil, fmt.Errorf("Nenhuma imagem encontrada para o produto %d", productID)
+	product, err := repository.GetProductByID(productID)
+	if err != nil {
+		return nil, err
 	}
-	return images, nil
+	if product == nil {
+		return nil, errors.New("produto não encontrado")
+	}
+	imagePaths := repository.ParseImageUrls(product.ImageUrls)
+	return imagePaths, nil
 }
 
 // DeleteProduct deleta um produto do banco de dados

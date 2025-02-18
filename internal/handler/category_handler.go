@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/service"
 )
+
 
 // CreateCategory cria uma nova categoria (exige token de admin)
 func CreateCategory(c *gin.Context) {
@@ -68,7 +70,6 @@ func GetCategories(c *gin.Context) {
 
 // GetCategoryImage retorna a imagem de uma categoria (público)
 func GetCategoryImage(c *gin.Context) {
-	// Obtém o ID da categoria da URL
 	categoryIDStr := c.Param("id")
 	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 64)
 	if err != nil {
@@ -76,30 +77,21 @@ func GetCategoryImage(c *gin.Context) {
 		return
 	}
 
-	// Conecte-se ao Supabase Storage
-	client := getSupabaseClient()
-	bucketName := "category-images"
-
-	// Defina o caminho do arquivo para a categoria
-	imagePath := fmt.Sprintf("categories/category_%d_", categoryID)
-
-	// Verifique se o arquivo existe no Supabase Storage
-	object, err := client.GetObject(bucketName, imagePath)
+	image, err := service.GetCategoryImage(uint(categoryID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar a imagem no Supabase: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter imagem da categoria: " + err.Error()})
 		return
 	}
 
-	// Construa a URL pública da imagem
-	imageURL := fmt.Sprintf("%s/storage/v1/object/public/%s/%s", os.Getenv("SUPABASE_URL"), bucketName, object.Key)
-
-	// Retorna a URL pública da imagem
+	// Gera a URL completa para a imagem usando BASEURL
+	BASEURL := os.Getenv("BASEURL")
+	imageURL := fmt.Sprintf("%s%s", BASEURL, image)
 	c.JSON(http.StatusOK, gin.H{"imageUrl": imageURL})
 }
 
 // UploadCategoryImage realiza o upload de uma imagem para uma categoria
 func UploadCategoryImage(c *gin.Context) {
-	// Obtém o ID da categoria da URL
+	// Obtém o id da categoria da URL
 	categoryIDStr := c.Param("id")
 	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 64)
 	if err != nil {
@@ -107,7 +99,7 @@ func UploadCategoryImage(c *gin.Context) {
 		return
 	}
 
-	// Obtém o arquivo da imagem
+	// Obtém o arquivo do formulário multipart
 	file, err := c.FormFile("image")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Imagem não encontrada: " + err.Error()})
@@ -115,33 +107,29 @@ func UploadCategoryImage(c *gin.Context) {
 	}
 
 	// Define o nome do arquivo e os caminhos para salvar e retornar
-	newFileName := fmt.Sprintf("category_%d_%s", categoryID, file.Filename)
-	uploadPath := fmt.Sprintf("categories/%s", newFileName)
+	filename := filepath.Base(file.Filename)
+	localPath := "./uploads/categories/" + filename   // Caminho para salvar no sistema de arquivos
+	relativePath := "/uploads/categories/" + filename // Caminho relativo para a URL
 
-	// Abre o arquivo
-	src, err := file.Open()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao abrir o arquivo"})
-		return
-	}
-	defer src.Close()
-
-	// Obtém o cliente Supabase
-	client := getSupabaseClient()
-	bucketName := "category-images"
-
-	// Faz o upload para o Supabase Storage
-	_, err = client.UploadFile(bucketName, uploadPath, src)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao enviar para o Supabase: " + err.Error()})
+	// Salva o arquivo no diretório local
+	if err := c.SaveUploadedFile(file, localPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar a imagem: " + err.Error()})
 		return
 	}
 
-	// Construa a URL pública da imagem
-	imageURL := fmt.Sprintf("%s/storage/v1/object/public/%s/%s", os.Getenv("SUPABASE_URL"), bucketName, uploadPath)
+	// Atualiza a categoria com a nova imagem (salva o caminho relativo no banco de dados)
+	if err := service.AddCategoryImage(uint(categoryID), relativePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar categoria com imagem: " + err.Error()})
+		return
+	}
 
-	// Retorna a URL da imagem enviada
-	c.JSON(http.StatusOK, gin.H{"message": "Imagem da categoria enviada!", "imageUrl": imageURL})
+	// Retorna a URL completa da imagem usando BASEURL
+	BASEURL := os.Getenv("BASEURL")
+	imageURL := fmt.Sprintf("%s%s", BASEURL, relativePath)
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "Imagem enviada com sucesso!",
+		"imageUrl": imageURL,
+	})
 }
 
 // DeleteCategoryImage deleta a imagem de uma categoria (exige token de admin)
