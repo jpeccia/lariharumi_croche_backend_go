@@ -37,7 +37,35 @@ func GetProducts() ([]model.Product, error) {
 	return products, nil
 }
 
-// GetProductsByCategory retorna produtos filtrados por categoria
+func GetPaginatedProducts(limit int, offset int) ([]model.Product, error) {
+	var products []model.Product
+
+	err := config.DB.Preload("Category").
+		Order("id DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&products).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return products, nil
+}
+
+func SearchProductsByName(searchTerm string, limit, offset int) ([]model.Product, error) {
+	var products []model.Product
+
+	query := config.DB.Where("LOWER(name) LIKE ?", "%"+strings.ToLower(searchTerm)+"%")
+
+	if limit > 0 {
+		query = query.Limit(limit).Offset(offset)
+	}
+
+	err := query.Find(&products).Error
+	return products, err
+}
+
 func GetProductsByCategory(categoryID uint) ([]model.Product, error) {
 	var products []model.Product
 	if err := config.DB.Where("category_id = ?", categoryID).Find(&products).Error; err != nil {
@@ -46,7 +74,6 @@ func GetProductsByCategory(categoryID uint) ([]model.Product, error) {
 	return products, nil
 }
 
-// UpdateProduct atualiza as informações de um produto
 func UpdateProduct(product *model.Product) error {
 	if err := config.DB.Save(product).Error; err != nil {
 		return err
@@ -54,17 +81,14 @@ func UpdateProduct(product *model.Product) error {
 	return nil
 }
 
-// ParseImageUrls converte o campo de imagens (string separada por vírgula) em um slice de strings
 func ParseImageUrls(imageUrls string) []string {
 	return strings.Split(imageUrls, ",")
 }
 
-// JoinImageUrls junta um slice de imagens em uma string separada por vírgula
 func JoinImageUrls(imagePaths []string) string {
 	return strings.Join(imagePaths, ",")
 }
 
-// DeleteProduct deleta um produto pelo ID
 func DeleteProduct(productID uint) error {
 	var product model.Product
 	if err := config.DB.Delete(&product, productID).Error; err != nil {

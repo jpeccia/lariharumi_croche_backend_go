@@ -206,8 +206,39 @@ func DeleteProductImage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Imagem deletada com sucesso!"})
 }
 
+func SearchProducts(c *gin.Context) {
+	searchTerm := c.Query("search")
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "10")
+
+	page, _ := strconv.Atoi(pageStr)
+	limit, _ := strconv.Atoi(limitStr)
+	if limit > 100 {
+		limit = 100
+	}
+	offset := (page - 1) * limit
+
+	products, err := service.SearchProducts(searchTerm, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar produtos: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, products)
+}
+
 func GetProducts(c *gin.Context) {
-	products, err := service.GetProducts()
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "10")
+
+	page, _ := strconv.Atoi(pageStr)
+	limit, _ := strconv.Atoi(limitStr)
+	if limit > 100 {
+		limit = 100 // Limite de segurança
+	}
+	offset := (page - 1) * limit
+
+	products, err := service.GetPaginatedProducts(limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter produtos: " + err.Error()})
 		return

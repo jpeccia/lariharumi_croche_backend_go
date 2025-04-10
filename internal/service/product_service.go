@@ -47,6 +47,15 @@ func AddProductImage(productID uint, imagePath string) error {
 	return repository.UpdateProduct(product)
 }
 
+func GetPaginatedProducts(limit int, offset int) ([]model.Product, error) {
+	return repository.GetPaginatedProducts(limit, offset)
+}
+
+func SearchProducts(searchTerm string, limit, offset int) ([]model.Product, error) {
+	return repository.SearchProductsByName(searchTerm, limit, offset)
+}
+
+
 // DeleteProductImage remove uma imagem do produto dado seu índice (posição na lista)
 func DeleteProductImage(productID uint, index int) error {
 	product, err := repository.GetProductByID(productID)
