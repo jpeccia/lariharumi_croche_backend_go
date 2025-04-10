@@ -41,7 +41,7 @@ func GetPaginatedProducts(limit int, offset int) ([]model.Product, error) {
 	var products []model.Product
 
 	err := config.DB.Preload("Category").
-		Order("id DESC").
+		Order("LOWER(name) ASC").
 		Limit(limit).
 		Offset(offset).
 		Find(&products).Error
