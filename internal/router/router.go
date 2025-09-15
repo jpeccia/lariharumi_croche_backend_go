@@ -38,13 +38,13 @@ func SetupRouter() *gin.Engine {
 	{
 		products.GET("/category/:id", handler.GetProductsByCategory)
 		products.GET("", handler.GetProducts)
+		products.GET("/search", handler.SearchProducts)
 		products.GET("/:id/images", handler.GetProductImages)
 	}
 
 	admin := r.Group("").Use(middleware.AuthMiddleware("ADMIN"))
 	{
 		admin.POST("/products", handler.CreateProduct)
-		admin.GET("/products/search", handler.SearchProducts)
 		admin.PATCH("/products/:id", handler.UpdateProduct)
 		admin.PUT("/categories/:id", handler.UpdateCategory)
 		admin.DELETE("/products/:id", handler.DeleteProduct)
