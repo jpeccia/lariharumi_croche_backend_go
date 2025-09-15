@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: lariharumi-croche-backend
+    env: go
+    plan: free
+    buildCommand: go build -o app .
+    startCommand: ./app
+    envVars:
+      - key: GO_VERSION
+        value: 1.23.4
+      - key: PORT
+        value: 10000
+      - key: BASEURL
+        value: https://lariharumi-croche-backend.onrender.com
+      - key: DB_HOST
+        value: your-db-host
+      - key: DB_USER
+        value: your-db-user
+      - key: DB_PASSWORD
+        value: your-db-password
+      - key: DB_NAME
+        value: your-db-name
+      - key: DB_PORT
+        value: 5432
+      - key: JWT_SECRET
+        value: your-jwt-secret
+      - key: IMGBB_API_KEY
+        value: your-imgbb-api-key
+      - key: FRONTEND_URL
+        value: https://your-frontend-url.com
+      - key: REDIS_URL
+        value: your-redis-url
+      - key: REDIS_PASSWORD
+        value: your-redis-password

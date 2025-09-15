@@ -18,6 +18,10 @@ func SetupRouter() *gin.Engine {
 
 	r.Static("/uploads", "./uploads")
 
+	// Health check endpoints (públicos)
+	r.GET("/health", handler.HealthCheck)
+	r.GET("/ping", handler.Ping)
+
 	auth := r.Group("/auth")
 	{
 		auth.POST("/register", handler.RegisterUser)

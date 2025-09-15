@@ -127,6 +127,12 @@ go run main.go
 - Upload paralelo de imagens
 - Queries otimizadas com índices
 
+### 🔄 **Cronjob para Render**
+- Ping automático a cada 25 segundos para manter aplicação ativa
+- Evita que o Render derrube a aplicação por inatividade
+- Endpoints de health check (`/health`, `/ping`)
+- Funciona automaticamente sem configuração adicional
+
 ---
 
 ## 🔑 Autenticação JWT
@@ -176,6 +182,34 @@ Agora você pode rodar comandos como:
 ## 📜 Licença
 
 Este projeto está sob a licença **MIT**. Sinta-se livre para contribuir e utilizar como desejar.
+
+---
+
+## 🚀 Deploy no Render
+
+A aplicação está preparada para deploy no Render com cronjob automático para manter a aplicação ativa.
+
+### 📋 Configuração Rápida
+
+1. **Conecte seu repositório** no Render
+2. **Configure as variáveis de ambiente** (veja `RENDER_DEPLOY.md`)
+3. **Deploy automático** - o cronjob manterá a aplicação ativa
+
+### 🔄 Cronjob Automático
+
+- ✅ Ping a cada 25 segundos (menos que 30s do Render)
+- ✅ Usa endpoints públicos (`/health`, `/ping`, `/categories`)
+- ✅ Funciona automaticamente sem configuração
+- ✅ Evita que o Render derrube a aplicação
+
+### 📊 Endpoints de Monitoramento
+
+- `GET /health` - Health check completo
+- `GET /ping` - Ping simples
+- `GET /categories` - Usado pelo cronjob
+- `GET /products` - Usado pelo cronjob
+
+**📖 Para instruções detalhadas, veja `RENDER_DEPLOY.md`**
 
 ---
 
