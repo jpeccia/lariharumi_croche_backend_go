@@ -1,17 +1,15 @@
 package handler
 
 import (
+	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-resty/resty/v2"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/repository"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/service"
-	"github.com/tidwall/gjson"
 )
 
 func CreateProduct(c *gin.Context) {
@@ -87,51 +85,41 @@ func UploadProductImages(c *gin.Context) {
 		return
 	}
 
-	apiKey := os.Getenv("IMGBB_API_KEY")
-	if apiKey == "" {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Chave da API ImgBB não encontrada"})
+	// Faz upload assíncrono
+	results, err := service.UploadProductImagesAsync(uint(productID), files)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao iniciar upload: " + err.Error()})
 		return
 	}
 
-	client := resty.New()
+	// Processa os resultados
 	var uploadedUrls []string
+	var errors []string
 
-	for _, file := range files {
-		// Abrindo a imagem
-		src, err := file.Open()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao abrir imagem: " + err.Error()})
-			return
-		}
-		defer src.Close()
-
-		// Enviando para o ImgBB
-		resp, err := client.R().
-			SetFileReader("image", file.Filename, src).
-			SetFormData(map[string]string{"key": apiKey}).
-			Post("https://api.imgbb.com/1/upload")
-
-		if err != nil || resp.StatusCode() != http.StatusOK {
-			log.Println("Erro no upload para ImgBB:", err, "Resposta:", resp.String())
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao fazer upload no ImgBB"})
-			return
-		}
-
-		// Extraindo URL da resposta
-		url := gjson.Get(resp.String(), "data.url").String()
-		uploadedUrls = append(uploadedUrls, url)
-
-		// Salvando a URL no banco de dados
-		if err := service.AddProductImage(uint(productID), url); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar produto com imagem: " + err.Error()})
-			return
+	for _, result := range results {
+		if result.Error != nil {
+			errors = append(errors, fmt.Sprintf("Imagem %d: %v", result.Index, result.Error))
+		} else {
+			uploadedUrls = append(uploadedUrls, result.URL)
+			// Salva a URL no banco de dados
+			if err := service.AddProductImage(uint(productID), result.URL); err != nil {
+				log.Printf("Erro ao salvar imagem %s no banco: %v", result.URL, err)
+			}
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Imagens enviadas com sucesso!",
-		"paths":   uploadedUrls,
-	})
+	response := gin.H{
+		"message": "Upload processado",
+		"success": len(uploadedUrls),
+		"failed":  len(errors),
+		"urls":    uploadedUrls,
+	}
+
+	if len(errors) > 0 {
+		response["errors"] = errors
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func UpdateProduct(c *gin.Context) {
@@ -213,18 +201,15 @@ func SearchProducts(c *gin.Context) {
 
 	page, _ := strconv.Atoi(pageStr)
 	limit, _ := strconv.Atoi(limitStr)
-	if limit > 100 {
-		limit = 100
-	}
-	offset := (page - 1) * limit
 
-	products, err := service.SearchProducts(searchTerm, limit, offset)
+	// Usa a nova função com metadados de paginação
+	paginatedResponse, err := service.SearchProductsWithMetadata(searchTerm, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar produtos: " + err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, products)
+	c.JSON(http.StatusOK, paginatedResponse)
 }
 
 func GetProducts(c *gin.Context) {
@@ -233,18 +218,15 @@ func GetProducts(c *gin.Context) {
 
 	page, _ := strconv.Atoi(pageStr)
 	limit, _ := strconv.Atoi(limitStr)
-	if limit > 100 {
-		limit = 100 // Limite de segurança
-	}
-	offset := (page - 1) * limit
 
-	products, err := service.GetPaginatedProducts(limit, offset)
+	// Usa a nova função com metadados de paginação
+	paginatedResponse, err := service.GetPaginatedProductsWithMetadata(page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter produtos: " + err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, products)
+	c.JSON(http.StatusOK, paginatedResponse)
 }
 
 func GetProductsByCategory(c *gin.Context) {
@@ -284,4 +266,20 @@ func GetProductImages(c *gin.Context) {
 
 	log.Printf("Enviando imagens para o frontend: %v", images)
 	c.JSON(http.StatusOK, images)
+}
+
+// GetUploadProgress retorna o progresso dos uploads para um produto
+func GetUploadProgress(c *gin.Context) {
+	productIDStr := c.Param("id")
+	productID, err := strconv.ParseUint(productIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID do produto inválido"})
+		return
+	}
+
+	progress := service.GetUploadProgress(uint(productID))
+	c.JSON(http.StatusOK, gin.H{
+		"productId": productID,
+		"progress":  progress,
+	})
 }

@@ -21,6 +21,10 @@ func CreateProduct(product *model.Product) error {
 		return fmt.Errorf("erro ao criar produto: %w", err)
 	}
 
+	// Invalida cache relacionado a produtos
+	cacheService := &CacheService{}
+	cacheService.InvalidateProductCache()
+
 	return nil
 }
 
@@ -48,13 +52,102 @@ func AddProductImage(productID uint, imagePath string) error {
 }
 
 func GetPaginatedProducts(limit int, offset int) ([]model.Product, error) {
-	return repository.GetPaginatedProducts(limit, offset)
+	cacheService := &CacheService{}
+
+	// Tenta buscar no cache primeiro
+	if products, found := cacheService.GetCachedProducts(limit, offset); found {
+		return products, nil
+	}
+
+	// Se não encontrou no cache, busca no banco
+	products, err := repository.GetPaginatedProducts(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	// Armazena no cache
+	cacheService.SetCachedProducts(products, limit, offset)
+
+	return products, nil
+}
+
+// GetPaginatedProductsWithMetadata retorna produtos paginados com metadados
+func GetPaginatedProductsWithMetadata(page, limit int) (*model.PaginatedResponse, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	offset := (page - 1) * limit
+
+	// Busca produtos e contagem total
+	products, total, err := repository.GetPaginatedProductsWithCount(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	// Calcula metadados de paginação
+	metadata := model.CalculatePagination(page, limit, total)
+
+	return &model.PaginatedResponse{
+		Data:     products,
+		Metadata: metadata,
+	}, nil
 }
 
 func SearchProducts(searchTerm string, limit, offset int) ([]model.Product, error) {
-	return repository.SearchProductsByName(searchTerm, limit, offset)
+	cacheService := &CacheService{}
+
+	// Tenta buscar no cache primeiro
+	if products, found := cacheService.GetCachedSearchProducts(searchTerm, limit, offset); found {
+		return products, nil
+	}
+
+	// Se não encontrou no cache, busca no banco
+	products, err := repository.SearchProductsByName(searchTerm, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	// Armazena no cache
+	cacheService.SetCachedSearchProducts(products, searchTerm, limit, offset)
+
+	return products, nil
 }
 
+// SearchProductsWithMetadata retorna produtos pesquisados com metadados de paginação
+func SearchProductsWithMetadata(searchTerm string, page, limit int) (*model.PaginatedResponse, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	offset := (page - 1) * limit
+
+	// Busca produtos e contagem total
+	products, total, err := repository.SearchProductsByNameWithCount(searchTerm, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	// Calcula metadados de paginação
+	metadata := model.CalculatePagination(page, limit, total)
+
+	return &model.PaginatedResponse{
+		Data:     products,
+		Metadata: metadata,
+	}, nil
+}
 
 // DeleteProductImage remove uma imagem do produto dado seu índice (posição na lista)
 func DeleteProductImage(productID uint, index int) error {
@@ -91,10 +184,22 @@ func GetProducts() ([]model.Product, error) {
 
 // GetProductsByCategory retorna os produtos filtrados por categoria
 func GetProductsByCategory(categoryID uint) ([]model.Product, error) {
+	cacheService := &CacheService{}
+
+	// Tenta buscar no cache primeiro
+	if products, found := cacheService.GetCachedProductsByCategory(categoryID); found {
+		return products, nil
+	}
+
+	// Se não encontrou no cache, busca no banco
 	products, err := repository.GetProductsByCategory(categoryID)
 	if err != nil {
 		return nil, err
 	}
+
+	// Armazena no cache
+	cacheService.SetCachedProductsByCategory(products, categoryID)
+
 	return products, nil
 }
 
@@ -130,6 +235,10 @@ func DeleteProduct(productID uint) error {
 		return err
 	}
 
+	// Invalida cache relacionado a produtos
+	cacheService := &CacheService{}
+	cacheService.InvalidateProductCache()
+
 	return nil
 }
 
@@ -152,6 +261,10 @@ func UpdateProduct(productID uint, updatedProduct *model.Product) error {
 	if err := repository.UpdateProduct(product); err != nil {
 		return err // Retorna erro se falhar ao atualizar no banco
 	}
+
+	// Invalida cache relacionado a produtos
+	cacheService := &CacheService{}
+	cacheService.InvalidateProductCache()
 
 	return nil
 }

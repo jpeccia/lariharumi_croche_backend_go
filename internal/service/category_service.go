@@ -19,6 +19,10 @@ func CreateCategory(category *model.Category) error {
 		return fmt.Errorf("erro ao criar categoria: %w", err)
 	}
 
+	// Invalida cache relacionado a categorias
+	cacheService := &CacheService{}
+	cacheService.InvalidateCategoryCache()
+
 	return nil
 }
 
@@ -29,15 +33,32 @@ func DeleteCategory(categoryID uint) error {
 	if err != nil {
 		return fmt.Errorf("erro ao deletar categoria: %w", err)
 	}
+
+	// Invalida cache relacionado a categorias
+	cacheService := &CacheService{}
+	cacheService.InvalidateCategoryCache()
+
 	return nil
 }
 
 // GetCategories retorna todas as categorias
 func GetCategories() ([]model.Category, error) {
+	cacheService := &CacheService{}
+
+	// Tenta buscar no cache primeiro
+	if categories, found := cacheService.GetCachedCategories(); found {
+		return categories, nil
+	}
+
+	// Se não encontrou no cache, busca no banco
 	categories, err := repository.GetCategories()
 	if err != nil {
 		return nil, err
 	}
+
+	// Armazena no cache
+	cacheService.SetCachedCategories(categories)
+
 	return categories, nil
 }
 
@@ -100,6 +121,10 @@ func UpdateCategory(categoryID uint, updatedCategory *model.Category) error {
 	if err := repository.UpdateCategory(category); err != nil {
 		return err // Retorna erro se falhar ao atualizar no banco
 	}
+
+	// Invalida cache relacionado a categorias
+	cacheService := &CacheService{}
+	cacheService.InvalidateCategoryCache()
 
 	return nil
 }

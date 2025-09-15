@@ -1,11 +1,6 @@
 package handler
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
-	"mime/multipart"
 	"net/http"
 	"os"
 	"strconv"
@@ -93,7 +88,6 @@ func GetCategoryImage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"imageUrl": imageURL})
 }
 
-
 func UploadCategoryImage(c *gin.Context) {
 	categoryIDStr := c.Param("id")
 	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 64)
@@ -108,65 +102,12 @@ func UploadCategoryImage(c *gin.Context) {
 		return
 	}
 
-	src, err := file.Open()
+	// Faz upload assíncrono
+	imageURL, err := service.UploadCategoryImageAsync(uint(categoryID), file)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao abrir a imagem: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao fazer upload: " + err.Error()})
 		return
 	}
-	defer src.Close()
-
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-	part, err := writer.CreateFormFile("image", file.Filename)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar formulário para upload: " + err.Error()})
-		return
-	}
-
-	if _, err := io.Copy(part, src); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao copiar imagem: " + err.Error()})
-		return
-	}
-	writer.Close()
-
-	// Obtém a chave da API do ImgBB do .env
-	imgBBKey := os.Getenv("IMGBB_API_KEY")
-	if imgBBKey == "" {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Chave da API ImgBB não encontrada"})
-		return
-	}
-
-	imgBBURL := fmt.Sprintf("https://api.imgbb.com/1/upload?key=%s", imgBBKey)
-	req, err := http.NewRequest("POST", imgBBURL, &buf)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar requisição para ImgBB: " + err.Error()})
-		return
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao enviar imagem para ImgBB: " + err.Error()})
-		return
-	}
-	defer resp.Body.Close()
-
-	// Decodifica a resposta do ImgBB
-	var imgBBResp ImgBBResponse
-	if err := json.NewDecoder(resp.Body).Decode(&imgBBResp); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao processar resposta do ImgBB: " + err.Error()})
-		return
-	}
-
-	// Verifica se o upload foi bem-sucedido
-	if !imgBBResp.Success {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Upload para ImgBB falhou"})
-		return
-	}
-
-	// Obtém a URL da imagem no ImgBB
-	imageURL := imgBBResp.Data.URL
 
 	// Atualiza a categoria no banco de dados com a URL da imagem
 	if err := service.AddCategoryImage(uint(categoryID), imageURL); err != nil {

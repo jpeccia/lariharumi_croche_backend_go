@@ -55,9 +55,17 @@ func UpdateUser(user *model.User) error {
 	return nil
 }
 
-// DeleteUser deleta um usuário pelo seu ID
+// DeleteUser deleta um usuário pelo seu ID (soft delete)
 func DeleteUser(userID uint) error {
 	if err := config.DB.Delete(&model.User{}, userID).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+// HardDeleteUser deleta permanentemente um usuário (apenas para admin)
+func HardDeleteUser(userID uint) error {
+	if err := config.DB.Unscoped().Delete(&model.User{}, userID).Error; err != nil {
 		return err
 	}
 	return nil

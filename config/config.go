@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	"github.com/jpeccia/lariharumi_croche_backend_go/internal/cache"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -46,4 +47,7 @@ func ConnectDB() {
 
 	fmt.Println("Banco de dados conectado!")
 	MigrateDB(DB)
+
+	// Inicializa o Redis
+	cache.InitRedis()
 }

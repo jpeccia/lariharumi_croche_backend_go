@@ -2,9 +2,11 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+
 	"github.com/jpeccia/lariharumi_croche_backend_go/config"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/handler"
-	"github.com/jpeccia/lariharumi_croche_backend_go/internal/middleware"
+
+
 )
 
 func SetupRouter() *gin.Engine {
@@ -50,6 +52,7 @@ func SetupRouter() *gin.Engine {
 		admin.POST("/categories/:id/upload-image", handler.UploadCategoryImage)
 		admin.DELETE("/products/:id/images/:index", handler.DeleteProductImage)
 		admin.DELETE("/categories/:id/image", handler.DeleteCategoryImage)
+		admin.GET("/products/:id/upload-progress", handler.GetUploadProgress)
 	}
 
 	return r

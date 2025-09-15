@@ -10,9 +10,11 @@ Esta API é um sistema completo de gerenciamento de produtos e categorias com au
 - **[Gin](https://github.com/gin-gonic/gin)** – Framework web leve e rápido
 - **[GORM](https://gorm.io/)** – ORM para manipulação do banco de dados
 - **[PostgreSQL Driver](https://github.com/lib/pq)** – Conexão com o banco de dados PostgreSQL
+- **[Redis](https://redis.io/)** – Sistema de cache para melhor performance
 - **[JWT](https://github.com/golang-jwt/jwt)** – Autenticação segura
 - **[dotenv](https://github.com/joho/godotenv)** – Gerenciamento de variáveis de ambiente
 - **[Air](https://github.com/cosmtrek/air)** – Live reload para desenvolvimento
+- **[ImgBB API](https://imgbb.com/)** – Upload de imagens para nuvem
 
 ---
 
@@ -32,14 +34,26 @@ Esta API é um sistema completo de gerenciamento de produtos e categorias com au
 3. Configure as variáveis de ambiente:
    Crie um arquivo `.env` na raiz do projeto e adicione:
    ```ini
-    JWT_SECRET=
-    DB_HOST=
-    DB_USER=
-    DB_PASSWORD=
-    DB_NAME=
-    DB_URL=
-    FRONTEND_URL=
-    BASEURL=
+   # Configurações do Banco de Dados
+   DB_HOST=localhost
+   DB_USER=postgres
+   DB_PASSWORD=password
+   DB_NAME=lariharumi_croche
+   DB_PORT=5432
+
+   # Configurações do Redis
+   REDIS_URL=localhost:6379
+   REDIS_PASSWORD=
+
+   # Configurações de Segurança
+   JWT_SECRET=seu_jwt_secret_aqui_muito_seguro
+
+   # Configurações da API ImgBB
+   IMGBB_API_KEY=sua_chave_api_imgbb_aqui
+
+   # Configurações do Frontend
+   FRONTEND_URL=http://localhost:3000
+   BASEURL=http://localhost:8080
    ```
 
 4. Rode seu docker para criar o banco de dados:
@@ -79,6 +93,39 @@ go run main.go
 ├── go.mod             # Dependências do projeto
 └── README.md          # Documentação
 ```
+
+---
+
+## ✨ Funcionalidades Implementadas
+
+### 🗃️ **Soft Delete**
+- Todos os modelos (User, Category, Product) agora usam soft delete
+- Registros não são removidos permanentemente do banco
+- Funções `HardDelete*` disponíveis para remoção permanente (apenas admin)
+
+### ⚡ **Sistema de Cache com Redis**
+- Cache automático para produtos e categorias
+- TTL configurável (15min para produtos, 1h para categorias)
+- Invalidação automática quando dados são modificados
+- Funciona mesmo sem Redis (graceful degradation)
+
+### 🔍 **Paginação Melhorada**
+- Metadados completos de paginação (total, páginas, navegação)
+- Contagem total de registros
+- Limites de segurança (máximo 100 por página)
+- Suporte a pesquisa com paginação
+
+### 🚀 **Upload Assíncrono**
+- Upload de múltiplas imagens em paralelo
+- Pool de workers configurável
+- Monitoramento de progresso
+- Tratamento de erros individual por arquivo
+
+### 🎯 **Otimizações de Performance**
+- Preload automático de relacionamentos (evita N+1 queries)
+- Cache inteligente com invalidação seletiva
+- Upload paralelo de imagens
+- Queries otimizadas com índices
 
 ---
 

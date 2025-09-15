@@ -17,7 +17,7 @@ func CreateCategory(category *model.Category) error {
 // GetCategories retorna todas as categorias
 func GetCategories() ([]model.Category, error) {
 	var categories []model.Category
-	if err := config.DB.Find(&categories).Error; err != nil {
+	if err := config.DB.Preload("Products").Find(&categories).Error; err != nil {
 		return nil, err
 	}
 	return categories, nil
@@ -35,9 +35,17 @@ func GetCategoryByID(categoryID uint) (*model.Category, error) {
 	return &category, nil
 }
 
-// DeleteCategory deleta uma categoria pelo seu ID
+// DeleteCategory deleta uma categoria pelo seu ID (soft delete)
 func DeleteCategory(categoryID uint) error {
 	if err := config.DB.Delete(&model.Category{}, categoryID).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+// HardDeleteCategory deleta permanentemente uma categoria (apenas para admin)
+func HardDeleteCategory(categoryID uint) error {
+	if err := config.DB.Unscoped().Delete(&model.Category{}, categoryID).Error; err != nil {
 		return err
 	}
 	return nil
