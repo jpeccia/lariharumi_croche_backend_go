@@ -2,11 +2,9 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-
 	"github.com/jpeccia/lariharumi_croche_backend_go/config"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/handler"
-
-
+	"github.com/jpeccia/lariharumi_croche_backend_go/internal/middleware"
 )
 
 func SetupRouter() *gin.Engine {
