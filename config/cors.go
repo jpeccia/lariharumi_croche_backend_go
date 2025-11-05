@@ -14,11 +14,22 @@ func CORSMiddleware() gin.HandlerFunc {
 	log.Println("CORS AllowOrigins:", frontendURL)
 
 	config := cors.Config{
-		AllowOrigins:     []string{frontendURL},
+		AllowOrigins:     filterEmpty([]string{frontendURL, "https://larifazcroche.vercel.app"}),
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Requested-With", "XMLHttpRequest"},
 		AllowCredentials: true,
 	}
 
 	return cors.New(config)
+}
+
+func filterEmpty(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, v := range in {
+		if v != "" {
+			out = append(out, v)
+		}
+	}
+	log.Println("CORS AllowOrigins:", out)
+	return out
 }
