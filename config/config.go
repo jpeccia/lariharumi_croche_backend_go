@@ -6,10 +6,11 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
-	"github.com/jpeccia/lariharumi_croche_backend_go/internal/cache"
-	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+
+	"github.com/jpeccia/lariharumi_croche_backend_go/internal/cache"
+	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
 )
 
 var DB *gorm.DB
@@ -26,7 +27,7 @@ func LoadEnv() {
 }
 
 func MigrateDB(db *gorm.DB) {
-	err := db.AutoMigrate(&model.User{}, &model.Category{}, &model.Product{})
+	err := db.AutoMigrate(&model.User{}, &model.Category{}, &model.Product{}, &model.Promotion{})
 	if err != nil {
 		log.Fatalf("Erro ao migrar o banco de dados: %v", err)
 	}

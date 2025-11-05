@@ -2,6 +2,7 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+
 	"github.com/jpeccia/lariharumi_croche_backend_go/config"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/handler"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/middleware"
@@ -42,6 +43,8 @@ func SetupRouter() *gin.Engine {
 		products.GET("/:id/images", handler.GetProductImages)
 	}
 
+	r.GET("/promotion", handler.GetPromotion)
+
 	admin := r.Group("").Use(middleware.AuthMiddleware("ADMIN"))
 	{
 		admin.POST("/products", handler.CreateProduct)
@@ -55,6 +58,8 @@ func SetupRouter() *gin.Engine {
 		admin.DELETE("/products/:id/images/:index", handler.DeleteProductImage)
 		admin.DELETE("/categories/:id/image", handler.DeleteCategoryImage)
 		admin.GET("/products/:id/upload-progress", handler.GetUploadProgress)
+
+		admin.PUT("/promotion", handler.UpdatePromotion)
 	}
 
 	return r
