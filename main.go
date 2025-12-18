@@ -15,9 +15,6 @@ func main() {
 	// Inicializa o serviço de upload assíncrono
 	service.InitUploadService(5) // 5 workers para uploads
 
-	// Inicializa o cronjob para manter a aplicação ativa no Render
-	service.InitCronService()
-
 	r := router.SetupRouter()
 
 	// Usa a porta do Render se disponível, senão 8080
@@ -27,6 +24,5 @@ func main() {
 	}
 
 	log.Printf("Servidor rodando na porta %s....", port)
-	log.Println("🔄 Cronjob de health check ativo - aplicação será mantida viva no Render")
 	r.Run(":" + port)
 }
