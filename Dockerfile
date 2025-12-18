@@ -1,5 +1,5 @@
-# Usando uma versão mais recente do Go
-FROM golang:1.23 AS builder
+# Usando Go 1.24 para corresponder ao go.mod
+FROM golang:1.24 AS builder
 
 # Define o diretório de trabalho dentro do container
 WORKDIR /app
