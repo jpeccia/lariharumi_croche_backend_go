@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/cache"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
@@ -15,6 +17,9 @@ import (
 
 var DB *gorm.DB
 
+/**
+ * LoadEnv loads environment variables from .env file if available.
+ */
 func LoadEnv() {
 	if _, err := os.Stat(".env"); err == nil {
 		err := godotenv.Load()
@@ -26,6 +31,10 @@ func LoadEnv() {
 	}
 }
 
+/**
+ * MigrateDB runs auto-migration for all registered models.
+ * @param db The GORM database instance.
+ */
 func MigrateDB(db *gorm.DB) {
 	err := db.AutoMigrate(&model.User{}, &model.Category{}, &model.Product{}, &model.Promotion{})
 	if err != nil {
@@ -33,6 +42,10 @@ func MigrateDB(db *gorm.DB) {
 	}
 }
 
+/**
+ * ConnectDB establishes a PostgreSQL connection with optimized pooling settings.
+ * Configures: 10 idle connections, 100 max open connections, 1-hour connection lifetime.
+ */
 func ConnectDB() {
 	LoadEnv()
 
@@ -41,14 +54,25 @@ func ConnectDB() {
 		os.Getenv("DB_NAME"), os.Getenv("DB_PORT"))
 
 	var err error
-	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+		PrepareStmt: true,
+		Logger:      logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		log.Fatal("Falha ao conectar ao banco de dados", err)
 	}
 
-	fmt.Println("Banco de dados conectado!")
+	sqlDB, err := DB.DB()
+	if err != nil {
+		log.Fatal("Falha ao obter conexão sql.DB", err)
+	}
+
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetConnMaxLifetime(time.Hour)
+
+	fmt.Println("Banco de dados conectado com connection pooling!")
 	MigrateDB(DB)
 
-	// Inicializa o Redis
 	cache.InitRedis()
 }

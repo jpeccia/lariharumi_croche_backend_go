@@ -14,10 +14,13 @@ func CreateCategory(category *model.Category) error {
 	return nil
 }
 
-// GetCategories retorna todas as categorias
+/**
+ * GetCategories returns all categories without eager loading products.
+ * Products should be fetched separately when needed.
+ */
 func GetCategories() ([]model.Category, error) {
 	var categories []model.Category
-	if err := config.DB.Preload("Products").Find(&categories).Error; err != nil {
+	if err := config.DB.Find(&categories).Error; err != nil {
 		return nil, err
 	}
 	return categories, nil

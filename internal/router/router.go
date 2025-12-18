@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 
 	"github.com/jpeccia/lariharumi_croche_backend_go/config"
@@ -8,9 +9,14 @@ import (
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/middleware"
 )
 
+/**
+ * SetupRouter configures the Gin router with all routes and middleware.
+ * Includes gzip compression for optimized response payloads.
+ */
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
+	r.Use(gzip.Gzip(gzip.DefaultCompression))
 	r.Use(config.CORSMiddleware())
 
 	r.OPTIONS("/*any", func(c *gin.Context) {

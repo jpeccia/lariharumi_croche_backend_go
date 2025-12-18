@@ -80,7 +80,7 @@ func GetPaginatedProductsWithCount(limit int, offset int) ([]model.Product, int6
 func SearchProductsByName(searchTerm string, limit, offset int) ([]model.Product, error) {
 	var products []model.Product
 
-	query := config.DB.Preload("Category").Where("LOWER(name) LIKE ?", "%"+strings.ToLower(searchTerm)+"%")
+	query := config.DB.Preload("Category").Where("name ILIKE ?", "%"+searchTerm+"%")
 
 	if limit > 0 {
 		query = query.Limit(limit).Offset(offset)
@@ -96,12 +96,12 @@ func SearchProductsByNameWithCount(searchTerm string, limit, offset int) ([]mode
 	var total int64
 
 	// Conta o total de produtos que correspondem à pesquisa
-	if err := config.DB.Model(&model.Product{}).Where("LOWER(name) LIKE ?", "%"+strings.ToLower(searchTerm)+"%").Count(&total).Error; err != nil {
+	if err := config.DB.Model(&model.Product{}).Where("name ILIKE ?", "%"+searchTerm+"%").Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	// Busca os produtos com preload
-	query := config.DB.Preload("Category").Where("LOWER(name) LIKE ?", "%"+strings.ToLower(searchTerm)+"%")
+	query := config.DB.Preload("Category").Where("name ILIKE ?", "%"+searchTerm+"%")
 	if limit > 0 {
 		query = query.Limit(limit).Offset(offset)
 	}

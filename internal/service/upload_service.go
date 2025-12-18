@@ -6,10 +6,20 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/tidwall/gjson"
 )
+
+/**
+ * Shared HTTP client for image uploads.
+ * Reusing a single client avoids connection overhead and memory leaks.
+ */
+var sharedRestyClient = resty.New().
+	SetTimeout(30 * time.Second).
+	SetRetryCount(2).
+	SetRetryWaitTime(1 * time.Second)
 
 // UploadResult representa o resultado de um upload
 type UploadResult struct {
@@ -92,8 +102,7 @@ func (us *UploadService) uploadSingleFile(file *multipart.FileHeader, index int)
 	defer src.Close()
 
 	// Faz upload usando resty
-	client := resty.New()
-	resp, err := client.R().
+	resp, err := sharedRestyClient.R().
 		SetFileReader("image", file.Filename, src).
 		SetFormData(map[string]string{"key": apiKey}).
 		Post("https://api.imgbb.com/1/upload")
@@ -181,8 +190,7 @@ func UploadCategoryImageAsync(categoryID uint, file *multipart.FileHeader) (stri
 	go func() {
 		defer close(resultChan)
 
-		client := resty.New()
-		resp, err := client.R().
+		resp, err := sharedRestyClient.R().
 			SetFileReader("image", file.Filename, src).
 			SetFormData(map[string]string{"key": apiKey}).
 			Post("https://api.imgbb.com/1/upload")
