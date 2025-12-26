@@ -18,6 +18,7 @@ func SetupRouter() *gin.Engine {
 
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
 	r.Use(config.CORSMiddleware())
+	r.Use(middleware.SecurityHeaders())
 
 	r.OPTIONS("/*any", func(c *gin.Context) {
 		c.Status(204)

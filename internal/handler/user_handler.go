@@ -9,9 +9,9 @@ import (
 
 func RegisterUser(c *gin.Context) {
 	var req struct {
-		Name     string `json:"name"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Name     string `json:"name" binding:"required,min=2,max=100"`
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required,min=8"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -31,20 +31,18 @@ func RegisterUser(c *gin.Context) {
 // LoginUser recebe as credenciais e retorna um token JWT
 func LoginUser(c *gin.Context) {
 	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required"`
 	}
 
-	// Valida o corpo da requisição
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Chama o serviço de login
 	token, err := service.LoginUser(req.Email, req.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Credenciais inválidas"})
 		return
 	}
 
