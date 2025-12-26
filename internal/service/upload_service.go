@@ -1,13 +1,21 @@
 package service
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/gen2brain/webp"
 	"github.com/go-resty/resty/v2"
 	"github.com/tidwall/gjson"
 )
@@ -46,27 +54,81 @@ type UploadService struct {
 
 var uploadService *UploadService
 
-// InitUploadService inicializa o serviço de upload
+/**
+ * WebPQuality defines the encoding quality for WebP conversion.
+ * Range: 0-100, where 80 offers a good balance between size and quality.
+ */
+const WebPQuality = 80
+
+/**
+ * convertToWebP reads an image from the provided reader, decodes it,
+ * and encodes it to WebP format with the configured quality setting.
+ * Supports JPEG, PNG, and GIF input formats.
+ *
+ * @param reader - The source image data reader
+ * @param originalName - Original filename to derive the WebP filename
+ * @returns - WebP encoded bytes, new filename, and any error
+ */
+func convertToWebP(reader io.Reader, originalName string) (*bytes.Reader, string, error) {
+	img, _, err := image.Decode(reader)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	var buf bytes.Buffer
+	opts := webp.Options{
+		Quality: WebPQuality,
+	}
+	if err := webp.Encode(&buf, img, opts); err != nil {
+		return nil, "", fmt.Errorf("failed to encode to WebP: %w", err)
+	}
+
+	baseName := strings.TrimSuffix(originalName, "."+getExtension(originalName))
+	webpName := baseName + ".webp"
+
+	return bytes.NewReader(buf.Bytes()), webpName, nil
+}
+
+/**
+ * getExtension extracts the file extension from a filename.
+ *
+ * @param filename - The filename to extract extension from
+ * @returns - The file extension without the leading dot
+ */
+func getExtension(filename string) string {
+	parts := strings.Split(filename, ".")
+	if len(parts) > 1 {
+		return parts[len(parts)-1]
+	}
+	return ""
+}
+
+/**
+ * InitUploadService initializes the upload service with a worker pool.
+ *
+ * @param maxWorkers - Maximum number of concurrent upload workers
+ */
 func InitUploadService(maxWorkers int) {
 	uploadService = &UploadService{
 		workerPool: make(chan struct{}, maxWorkers),
-		jobQueue:   make(chan UploadJob, 100), // Buffer de 100 jobs
+		jobQueue:   make(chan UploadJob, 100),
 		results:    make(map[uint][]UploadResult),
 	}
 
-	// Inicia os workers
 	for i := 0; i < maxWorkers; i++ {
 		go uploadService.worker()
 	}
 }
 
-// worker processa jobs de upload
+/**
+ * worker processes upload jobs from the job queue.
+ */
 func (us *UploadService) worker() {
 	for job := range us.jobQueue {
-		us.workerPool <- struct{}{} // Adquire um worker
+		us.workerPool <- struct{}{}
 
 		go func(j UploadJob) {
-			defer func() { <-us.workerPool }() // Libera o worker
+			defer func() { <-us.workerPool }()
 			defer us.wg.Done()
 
 			result := us.uploadSingleFile(j.File, j.Index)
@@ -81,52 +143,64 @@ func (us *UploadService) worker() {
 	}
 }
 
-// uploadSingleFile faz upload de um arquivo para o ImgBB
+/**
+ * uploadSingleFile converts an image to WebP format and uploads it to ImgBB.
+ * The conversion reduces file size significantly while maintaining quality.
+ *
+ * @param file - The multipart file header from the HTTP request
+ * @param index - The index of the file in the upload batch
+ * @returns - UploadResult containing the URL or error
+ */
 func (us *UploadService) uploadSingleFile(file *multipart.FileHeader, index int) UploadResult {
 	apiKey := os.Getenv("IMGBB_API_KEY")
 	if apiKey == "" {
 		return UploadResult{
 			Index: index,
-			Error: fmt.Errorf("chave da API ImgBB não encontrada"),
+			Error: fmt.Errorf("IMGBB_API_KEY environment variable not found"),
 		}
 	}
 
-	// Abre o arquivo
 	src, err := file.Open()
 	if err != nil {
 		return UploadResult{
 			Index: index,
-			Error: fmt.Errorf("erro ao abrir arquivo: %w", err),
+			Error: fmt.Errorf("failed to open file: %w", err),
 		}
 	}
 	defer src.Close()
 
-	// Faz upload usando resty
+	webpReader, webpFilename, err := convertToWebP(src, file.Filename)
+	if err != nil {
+		return UploadResult{
+			Index: index,
+			Error: fmt.Errorf("failed to convert to WebP: %w", err),
+		}
+	}
+
 	resp, err := sharedRestyClient.R().
-		SetFileReader("image", file.Filename, src).
+		SetFileReader("image", webpFilename, webpReader).
 		SetFormData(map[string]string{"key": apiKey}).
 		Post("https://api.imgbb.com/1/upload")
 
 	if err != nil {
 		return UploadResult{
 			Index: index,
-			Error: fmt.Errorf("erro no upload: %w", err),
+			Error: fmt.Errorf("upload failed: %w", err),
 		}
 	}
 
 	if resp.StatusCode() != http.StatusOK {
 		return UploadResult{
 			Index: index,
-			Error: fmt.Errorf("upload falhou com status %d", resp.StatusCode()),
+			Error: fmt.Errorf("upload failed with status %d", resp.StatusCode()),
 		}
 	}
 
-	// Extrai URL da resposta
 	url := gjson.Get(resp.String(), "data.url").String()
 	if url == "" {
 		return UploadResult{
 			Index: index,
-			Error: fmt.Errorf("URL não encontrada na resposta"),
+			Error: fmt.Errorf("URL not found in response"),
 		}
 	}
 
@@ -169,53 +243,60 @@ func UploadProductImagesAsync(productID uint, files []*multipart.FileHeader) ([]
 	return results, nil
 }
 
-// UploadCategoryImageAsync faz upload assíncrono de uma imagem de categoria
+/**
+ * UploadCategoryImageAsync uploads a single category image asynchronously,
+ * converting it to WebP format before upload.
+ *
+ * @param categoryID - The ID of the category (currently unused but kept for interface consistency)
+ * @param file - The multipart file header from the HTTP request
+ * @returns - The uploaded image URL and any error
+ */
 func UploadCategoryImageAsync(categoryID uint, file *multipart.FileHeader) (string, error) {
 	apiKey := os.Getenv("IMGBB_API_KEY")
 	if apiKey == "" {
-		return "", fmt.Errorf("chave da API ImgBB não encontrada")
+		return "", fmt.Errorf("IMGBB_API_KEY environment variable not found")
 	}
 
-	// Abre o arquivo
 	src, err := file.Open()
 	if err != nil {
-		return "", fmt.Errorf("erro ao abrir arquivo: %w", err)
+		return "", fmt.Errorf("failed to open file: %w", err)
 	}
 	defer src.Close()
 
-	// Cria um canal para receber o resultado
+	webpReader, webpFilename, err := convertToWebP(src, file.Filename)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert to WebP: %w", err)
+	}
+
 	resultChan := make(chan UploadResult, 1)
 
-	// Faz upload em uma goroutine
 	go func() {
 		defer close(resultChan)
 
 		resp, err := sharedRestyClient.R().
-			SetFileReader("image", file.Filename, src).
+			SetFileReader("image", webpFilename, webpReader).
 			SetFormData(map[string]string{"key": apiKey}).
 			Post("https://api.imgbb.com/1/upload")
 
 		if err != nil {
-			resultChan <- UploadResult{Error: fmt.Errorf("erro no upload: %w", err)}
+			resultChan <- UploadResult{Error: fmt.Errorf("upload failed: %w", err)}
 			return
 		}
 
 		if resp.StatusCode() != http.StatusOK {
-			resultChan <- UploadResult{Error: fmt.Errorf("upload falhou com status %d", resp.StatusCode())}
+			resultChan <- UploadResult{Error: fmt.Errorf("upload failed with status %d", resp.StatusCode())}
 			return
 		}
 
-		// Extrai URL da resposta
 		url := gjson.Get(resp.String(), "data.url").String()
 		if url == "" {
-			resultChan <- UploadResult{Error: fmt.Errorf("URL não encontrada na resposta")}
+			resultChan <- UploadResult{Error: fmt.Errorf("URL not found in response")}
 			return
 		}
 
 		resultChan <- UploadResult{URL: url}
 	}()
 
-	// Aguarda o resultado
 	result := <-resultChan
 	if result.Error != nil {
 		return "", result.Error

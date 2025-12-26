@@ -36,12 +36,14 @@ func SetupRouter() *gin.Engine {
 	}
 
 	categories := r.Group("/categories")
+	categories.Use(middleware.CacheControl(60, true))
 	{
 		categories.GET("", handler.GetCategories)
 		categories.GET("/:id/image", handler.GetCategoryImage)
 	}
 
 	products := r.Group("/products")
+	products.Use(middleware.CacheControl(60, true))
 	{
 		products.GET("/category/:id", handler.GetProductsByCategory)
 		products.GET("", handler.GetProducts)
