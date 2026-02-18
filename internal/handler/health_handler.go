@@ -51,19 +51,17 @@ func HealthCheck(c *gin.Context) {
 		return
 	}
 
-	// Verifica cache (Redis)
 	if !isCacheAvailable() {
 		response.Cache = "unavailable"
-		// Não marca como unhealthy se apenas o cache estiver indisponível
 	}
 
 	c.JSON(http.StatusOK, response)
 }
 
-// isCacheAvailable verifica se o cache está disponível
+/**
+ * isCacheAvailable returns true since the in-memory cache is always available.
+ */
 func isCacheAvailable() bool {
-	// Aqui você pode implementar uma verificação específica do Redis
-	// Por enquanto, retorna true assumindo que o cache está funcionando
 	return true
 }
 

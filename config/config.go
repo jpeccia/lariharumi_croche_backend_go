@@ -75,9 +75,14 @@ func ConnectDB() {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(time.Hour)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+
+	if err := sqlDB.Ping(); err != nil {
+		log.Fatalf("Failed to ping database: %v", err)
+	}
 
 	fmt.Println("Banco de dados conectado com connection pooling!")
 	MigrateDB(DB)
 
-	cache.InitRedis()
+	cache.InitCache()
 }

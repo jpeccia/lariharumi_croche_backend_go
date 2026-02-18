@@ -3,129 +3,185 @@ package service
 import (
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/cache"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
 )
 
 const (
-	// TTL padrão para cache
-	DefaultTTL = 15 * time.Minute
-	// TTL para produtos (mais longo pois mudam menos)
-	ProductTTL = 30 * time.Minute
-	// TTL para categorias (mais longo pois mudam menos)
+	DefaultTTL  = 15 * time.Minute
+	ProductTTL  = 30 * time.Minute
 	CategoryTTL = 1 * time.Hour
 )
 
-// CacheService gerencia o cache de produtos e categorias
+/**
+ * CacheService manages in-memory caching for products and categories.
+ */
 type CacheService struct{}
 
-// GetCachedProducts busca produtos no cache
+/**
+ * GetCachedProducts retrieves paginated products from cache.
+ * Returns the products slice and a boolean indicating cache hit.
+ */
 func (cs *CacheService) GetCachedProducts(limit, offset int) ([]model.Product, bool) {
 	key := cache.GenerateKey("products", limit, offset)
 	var products []model.Product
 
 	err := cache.Get(key, &products)
-	if err == redis.Nil {
-		return nil, false // Cache miss
-	}
 	if err != nil {
-		return nil, false // Erro no cache, não usar
+		return nil, false
 	}
 
-	return products, true // Cache hit
+	return products, true
 }
 
-// SetCachedProducts armazena produtos no cache
+/**
+ * SetCachedProducts stores paginated products in cache with ProductTTL.
+ */
 func (cs *CacheService) SetCachedProducts(products []model.Product, limit, offset int) {
 	key := cache.GenerateKey("products", limit, offset)
 	cache.Set(key, products, ProductTTL)
 }
 
-// GetCachedProductsByCategory busca produtos por categoria no cache
+/**
+ * GetCachedProductsByCategory retrieves category-filtered products from cache.
+ */
 func (cs *CacheService) GetCachedProductsByCategory(categoryID uint) ([]model.Product, bool) {
 	key := cache.GenerateKey("products_category", categoryID)
 	var products []model.Product
 
 	err := cache.Get(key, &products)
-	if err == redis.Nil {
-		return nil, false // Cache miss
-	}
 	if err != nil {
-		return nil, false // Erro no cache, não usar
+		return nil, false
 	}
 
-	return products, true // Cache hit
+	return products, true
 }
 
-// SetCachedProductsByCategory armazena produtos por categoria no cache
+/**
+ * SetCachedProductsByCategory stores category-filtered products in cache.
+ */
 func (cs *CacheService) SetCachedProductsByCategory(products []model.Product, categoryID uint) {
 	key := cache.GenerateKey("products_category", categoryID)
 	cache.Set(key, products, ProductTTL)
 }
 
-// GetCachedSearchProducts busca produtos pesquisados no cache
+/**
+ * GetCachedSearchProducts retrieves search results from cache.
+ */
 func (cs *CacheService) GetCachedSearchProducts(searchTerm string, limit, offset int) ([]model.Product, bool) {
 	key := cache.GenerateKey("products_search", searchTerm, limit, offset)
 	var products []model.Product
 
 	err := cache.Get(key, &products)
-	if err == redis.Nil {
-		return nil, false // Cache miss
-	}
 	if err != nil {
-		return nil, false // Erro no cache, não usar
+		return nil, false
 	}
 
-	return products, true // Cache hit
+	return products, true
 }
 
-// SetCachedSearchProducts armazena produtos pesquisados no cache
+/**
+ * SetCachedSearchProducts stores search results in cache.
+ */
 func (cs *CacheService) SetCachedSearchProducts(products []model.Product, searchTerm string, limit, offset int) {
 	key := cache.GenerateKey("products_search", searchTerm, limit, offset)
 	cache.Set(key, products, ProductTTL)
 }
 
-// GetCachedCategories busca categorias no cache
+/**
+ * GetCachedCategories retrieves all categories from cache.
+ */
 func (cs *CacheService) GetCachedCategories() ([]model.Category, bool) {
 	key := "categories"
 	var categories []model.Category
 
 	err := cache.Get(key, &categories)
-	if err == redis.Nil {
-		return nil, false // Cache miss
-	}
 	if err != nil {
-		return nil, false // Erro no cache, não usar
+		return nil, false
 	}
 
-	return categories, true // Cache hit
+	return categories, true
 }
 
-// SetCachedCategories armazena categorias no cache
+/**
+ * SetCachedCategories stores all categories in cache with CategoryTTL.
+ */
 func (cs *CacheService) SetCachedCategories(categories []model.Category) {
 	key := "categories"
 	cache.Set(key, categories, CategoryTTL)
 }
 
-// InvalidateProductCache invalida cache relacionado a produtos
+/**
+ * GetCachedPaginatedProducts retrieves a full paginated response from cache.
+ */
+func (cs *CacheService) GetCachedPaginatedProducts(page, limit int) (*model.PaginatedResponse, bool) {
+	key := cache.GenerateKey("paginated_products", page, limit)
+	var response model.PaginatedResponse
+
+	err := cache.Get(key, &response)
+	if err != nil {
+		return nil, false
+	}
+
+	return &response, true
+}
+
+/**
+ * SetCachedPaginatedProducts stores a full paginated response in cache.
+ */
+func (cs *CacheService) SetCachedPaginatedProducts(response *model.PaginatedResponse, page, limit int) {
+	key := cache.GenerateKey("paginated_products", page, limit)
+	cache.Set(key, response, ProductTTL)
+}
+
+/**
+ * GetCachedSearchWithMetadata retrieves a paginated search response from cache.
+ */
+func (cs *CacheService) GetCachedSearchWithMetadata(searchTerm string, page, limit int) (*model.PaginatedResponse, bool) {
+	key := cache.GenerateKey("search_products", searchTerm, page, limit)
+	var response model.PaginatedResponse
+
+	err := cache.Get(key, &response)
+	if err != nil {
+		return nil, false
+	}
+
+	return &response, true
+}
+
+/**
+ * SetCachedSearchWithMetadata stores a paginated search response in cache.
+ */
+func (cs *CacheService) SetCachedSearchWithMetadata(response *model.PaginatedResponse, searchTerm string, page, limit int) {
+	key := cache.GenerateKey("search_products", searchTerm, page, limit)
+	cache.Set(key, response, ProductTTL)
+}
+
+/**
+ * InvalidateProductCache removes all product-related cache entries.
+ */
 func (cs *CacheService) InvalidateProductCache() {
-	// Remove todos os caches de produtos
 	cache.DeletePattern("products*")
 	cache.DeletePattern("products_category*")
 	cache.DeletePattern("products_search*")
+	cache.DeletePattern("paginated_products*")
+	cache.DeletePattern("search_products*")
 }
 
-// InvalidateCategoryCache invalida cache relacionado a categorias
+/**
+ * InvalidateCategoryCache removes category cache and related product caches.
+ */
 func (cs *CacheService) InvalidateCategoryCache() {
-	// Remove cache de categorias
 	cache.Delete("categories")
-	// Também remove produtos por categoria pois podem ter mudado
 	cache.DeletePattern("products_category*")
 }
 
-// InvalidateAllCache invalida todo o cache
+/**
+ * InvalidateAllCache removes every cached entry.
+ */
 func (cs *CacheService) InvalidateAllCache() {
 	cache.DeletePattern("products*")
 	cache.DeletePattern("categories*")
+	cache.DeletePattern("paginated_products*")
+	cache.DeletePattern("search_products*")
 }

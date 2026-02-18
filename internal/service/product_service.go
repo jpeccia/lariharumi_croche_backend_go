@@ -83,21 +83,29 @@ func GetPaginatedProductsWithMetadata(page, limit int) (*model.PaginatedResponse
 		limit = 100
 	}
 
+	cacheService := &CacheService{}
+
+	if cached, found := cacheService.GetCachedPaginatedProducts(page, limit); found {
+		return cached, nil
+	}
+
 	offset := (page - 1) * limit
 
-	// Busca produtos e contagem total
 	products, total, err := repository.GetPaginatedProductsWithCount(limit, offset)
 	if err != nil {
 		return nil, err
 	}
 
-	// Calcula metadados de paginação
 	metadata := model.CalculatePagination(page, limit, total)
 
-	return &model.PaginatedResponse{
+	response := &model.PaginatedResponse{
 		Data:     products,
 		Metadata: metadata,
-	}, nil
+	}
+
+	cacheService.SetCachedPaginatedProducts(response, page, limit)
+
+	return response, nil
 }
 
 func SearchProducts(searchTerm string, limit, offset int) ([]model.Product, error) {
@@ -132,21 +140,29 @@ func SearchProductsWithMetadata(searchTerm string, page, limit int) (*model.Pagi
 		limit = 100
 	}
 
+	cacheService := &CacheService{}
+
+	if cached, found := cacheService.GetCachedSearchWithMetadata(searchTerm, page, limit); found {
+		return cached, nil
+	}
+
 	offset := (page - 1) * limit
 
-	// Busca produtos e contagem total
 	products, total, err := repository.SearchProductsByNameWithCount(searchTerm, limit, offset)
 	if err != nil {
 		return nil, err
 	}
 
-	// Calcula metadados de paginação
 	metadata := model.CalculatePagination(page, limit, total)
 
-	return &model.PaginatedResponse{
+	response := &model.PaginatedResponse{
 		Data:     products,
 		Metadata: metadata,
-	}, nil
+	}
+
+	cacheService.SetCachedSearchWithMetadata(response, searchTerm, page, limit)
+
+	return response, nil
 }
 
 // DeleteProductImage remove uma imagem do produto dado seu índice (posição na lista)

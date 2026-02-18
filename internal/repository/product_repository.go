@@ -40,8 +40,8 @@ func GetProducts() ([]model.Product, error) {
 func GetPaginatedProducts(limit int, offset int) ([]model.Product, error) {
 	var products []model.Product
 
-	err := config.DB.Preload("Category").
-		Order("LOWER(name) ASC").
+	err := config.DB.Joins("Category").
+		Order("name ASC").
 		Limit(limit).
 		Offset(offset).
 		Find(&products).Error
@@ -64,8 +64,8 @@ func GetPaginatedProductsWithCount(limit int, offset int) ([]model.Product, int6
 	}
 
 	// Busca os produtos com preload
-	err := config.DB.Preload("Category").
-		Order("LOWER(name) ASC").
+	err := config.DB.Joins("Category").
+		Order("name ASC").
 		Limit(limit).
 		Offset(offset).
 		Find(&products).Error
@@ -80,7 +80,7 @@ func GetPaginatedProductsWithCount(limit int, offset int) ([]model.Product, int6
 func SearchProductsByName(searchTerm string, limit, offset int) ([]model.Product, error) {
 	var products []model.Product
 
-	query := config.DB.Preload("Category").Where("name ILIKE ?", "%"+searchTerm+"%")
+	query := config.DB.Joins("Category").Where("products.name ILIKE ?", "%"+searchTerm+"%")
 
 	if limit > 0 {
 		query = query.Limit(limit).Offset(offset)
@@ -96,12 +96,12 @@ func SearchProductsByNameWithCount(searchTerm string, limit, offset int) ([]mode
 	var total int64
 
 	// Conta o total de produtos que correspondem à pesquisa
-	if err := config.DB.Model(&model.Product{}).Where("name ILIKE ?", "%"+searchTerm+"%").Count(&total).Error; err != nil {
+	if err := config.DB.Model(&model.Product{}).Where("products.name ILIKE ?", "%"+searchTerm+"%").Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	// Busca os produtos com preload
-	query := config.DB.Preload("Category").Where("name ILIKE ?", "%"+searchTerm+"%")
+	query := config.DB.Joins("Category").Where("products.name ILIKE ?", "%"+searchTerm+"%")
 	if limit > 0 {
 		query = query.Limit(limit).Offset(offset)
 	}
@@ -112,7 +112,7 @@ func SearchProductsByNameWithCount(searchTerm string, limit, offset int) ([]mode
 
 func GetProductsByCategory(categoryID uint) ([]model.Product, error) {
 	var products []model.Product
-	if err := config.DB.Preload("Category").Where("category_id = ?", categoryID).Find(&products).Error; err != nil {
+	if err := config.DB.Joins("Category").Where("products.category_id = ?", categoryID).Find(&products).Error; err != nil {
 		return nil, err
 	}
 	return products, nil
