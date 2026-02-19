@@ -13,7 +13,7 @@ type Product struct {
 	gorm.Model
 	Name        string   `json:"name" gorm:"index:idx_product_name;index:idx_product_category_name,priority:2"`
 	Description string   `json:"description"`
-	ImageUrls   string   `json:"imageUrls"`
+	ImageUrls   string   `json:"imageUrls" gorm:"type:text"`
 	PriceRange  string   `json:"priceRange"`
 	CategoryID  uint     `json:"categoryId" gorm:"index:idx_product_category;index:idx_product_category_name,priority:1"`
 	Category    Category `json:"category"`

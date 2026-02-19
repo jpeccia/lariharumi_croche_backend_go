@@ -158,6 +158,45 @@ func (cs *CacheService) SetCachedSearchWithMetadata(response *model.PaginatedRes
 }
 
 /**
+ * GetCachedProductImages retrieves parsed image URLs for a product from cache.
+ * Returns the image slice and a boolean indicating cache hit.
+ *
+ * @param productID - The product identifier
+ */
+func (cs *CacheService) GetCachedProductImages(productID uint) ([]string, bool) {
+	key := cache.GenerateKey("product_images", productID)
+	var images []string
+
+	err := cache.Get(key, &images)
+	if err != nil {
+		return nil, false
+	}
+
+	return images, true
+}
+
+/**
+ * SetCachedProductImages stores parsed image URLs for a product in cache.
+ *
+ * @param images - The parsed image URL slice
+ * @param productID - The product identifier
+ */
+func (cs *CacheService) SetCachedProductImages(images []string, productID uint) {
+	key := cache.GenerateKey("product_images", productID)
+	cache.Set(key, images, ProductTTL)
+}
+
+/**
+ * InvalidateProductImageCache removes the image cache for a specific product.
+ *
+ * @param productID - The product identifier whose image cache should be cleared
+ */
+func (cs *CacheService) InvalidateProductImageCache(productID uint) {
+	key := cache.GenerateKey("product_images", productID)
+	cache.Delete(key)
+}
+
+/**
  * InvalidateProductCache removes all product-related cache entries.
  */
 func (cs *CacheService) InvalidateProductCache() {
@@ -166,6 +205,7 @@ func (cs *CacheService) InvalidateProductCache() {
 	cache.DeletePattern("products_search*")
 	cache.DeletePattern("paginated_products*")
 	cache.DeletePattern("search_products*")
+	cache.DeletePattern("product_images*")
 }
 
 /**
@@ -184,4 +224,5 @@ func (cs *CacheService) InvalidateAllCache() {
 	cache.DeletePattern("categories*")
 	cache.DeletePattern("paginated_products*")
 	cache.DeletePattern("search_products*")
+	cache.DeletePattern("product_images*")
 }

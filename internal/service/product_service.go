@@ -28,9 +28,14 @@ func CreateProduct(product *model.Product) error {
 	return nil
 }
 
-// AddProductImage adiciona um caminho de imagem ao produto
+/**
+ * AddProductImage appends an image URL to the product's comma-separated list
+ * and invalidates the corresponding image cache entry.
+ *
+ * @param productID - The target product ID
+ * @param imagePath - The new image URL to append
+ */
 func AddProductImage(productID uint, imagePath string) error {
-	// Buscar o produto pelo ID (opcional, para verificar se existe)
 	product, err := repository.GetProductByID(productID)
 	if err != nil {
 		return err
@@ -39,16 +44,20 @@ func AddProductImage(productID uint, imagePath string) error {
 		return errors.New("produto não encontrado")
 	}
 
-	// Aqui supomos que o campo ImageUrls é uma string que armazena os caminhos separados por vírgula.
-	// Em uma implementação real, pode ser um array ou uma tabela associada.
 	if product.ImageUrls != "" {
 		product.ImageUrls = product.ImageUrls + "," + imagePath
 	} else {
 		product.ImageUrls = imagePath
 	}
 
-	// Atualiza o produto com o novo caminho de imagem.
-	return repository.UpdateProduct(product)
+	if err := repository.UpdateProduct(product); err != nil {
+		return err
+	}
+
+	cacheService := &CacheService{}
+	cacheService.InvalidateProductImageCache(productID)
+
+	return nil
 }
 
 func GetPaginatedProducts(limit int, offset int) ([]model.Product, error) {
@@ -165,7 +174,13 @@ func SearchProductsWithMetadata(searchTerm string, page, limit int) (*model.Pagi
 	return response, nil
 }
 
-// DeleteProductImage remove uma imagem do produto dado seu índice (posição na lista)
+/**
+ * DeleteProductImage removes an image from the product by its index position
+ * and invalidates the corresponding image cache entry.
+ *
+ * @param productID - The target product ID
+ * @param index - Zero-based index of the image to remove
+ */
 func DeleteProductImage(productID uint, index int) error {
 	product, err := repository.GetProductByID(productID)
 	if err != nil {
@@ -175,18 +190,22 @@ func DeleteProductImage(productID uint, index int) error {
 		return errors.New("produto não encontrado")
 	}
 
-	// Supondo que as imagens estejam armazenadas como string separada por vírgula.
 	imagePaths := repository.ParseImageUrls(product.ImageUrls)
 	if index < 0 || index >= len(imagePaths) {
 		return errors.New("índice de imagem inválido")
 	}
 
-	// Remove a imagem do slice
 	imagePaths = append(imagePaths[:index], imagePaths[index+1:]...)
-	// Atualiza o campo ImageUrls
 	product.ImageUrls = repository.JoinImageUrls(imagePaths)
 
-	return repository.UpdateProduct(product)
+	if err := repository.UpdateProduct(product); err != nil {
+		return err
+	}
+
+	cacheService := &CacheService{}
+	cacheService.InvalidateProductImageCache(productID)
+
+	return nil
 }
 
 // GetProducts retorna todos os produtos
@@ -219,9 +238,20 @@ func GetProductsByCategory(categoryID uint) ([]model.Product, error) {
 	return products, nil
 }
 
-// GetProductImages retorna as imagens de um produto
-// Se o campo ImageUrls for uma string separada por vírgula, podemos utilizar essa lógica para transformá-la em slice.
+/**
+ * GetProductImages retrieves parsed image URLs for a product using cache-aside.
+ * On cache hit, returns immediately without DB access.
+ * On cache miss, fetches from DB, populates cache, and returns.
+ *
+ * @param productID - The product ID to fetch images for
+ */
 func GetProductImages(productID uint) ([]string, error) {
+	cacheService := &CacheService{}
+
+	if images, found := cacheService.GetCachedProductImages(productID); found {
+		return images, nil
+	}
+
 	product, err := repository.GetProductByID(productID)
 	if err != nil {
 		return nil, err
@@ -229,8 +259,51 @@ func GetProductImages(productID uint) ([]string, error) {
 	if product == nil {
 		return nil, errors.New("produto não encontrado")
 	}
+
 	imagePaths := repository.ParseImageUrls(product.ImageUrls)
+
+	cacheService.SetCachedProductImages(imagePaths, productID)
+
 	return imagePaths, nil
+}
+
+/**
+ * GetBatchProductImages retrieves images for multiple products in a single operation.
+ * Uses cache-aside per product: cached products are served from memory,
+ * cache misses are fetched in a single DB query using WHERE IN.
+ * Time complexity: O(n) where n = number of requested product IDs.
+ *
+ * @param productIDs - Slice of product IDs to fetch images for
+ */
+func GetBatchProductImages(productIDs []uint) (map[uint][]string, error) {
+	cacheService := &CacheService{}
+	result := make(map[uint][]string, len(productIDs))
+	var missIDs []uint
+
+	for _, id := range productIDs {
+		if images, found := cacheService.GetCachedProductImages(id); found {
+			result[id] = images
+		} else {
+			missIDs = append(missIDs, id)
+		}
+	}
+
+	if len(missIDs) == 0 {
+		return result, nil
+	}
+
+	products, err := repository.GetProductsByIDs(missIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch products batch: %w", err)
+	}
+
+	for i := range products {
+		images := repository.ParseImageUrls(products[i].ImageUrls)
+		result[products[i].ID] = images
+		cacheService.SetCachedProductImages(images, products[i].ID)
+	}
+
+	return result, nil
 }
 
 // DeleteProduct deleta um produto do banco de dados

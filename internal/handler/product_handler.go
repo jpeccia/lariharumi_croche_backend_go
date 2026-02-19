@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jpeccia/lariharumi_croche_backend_go/internal/model"
@@ -246,29 +247,31 @@ func GetProductsByCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, products)
 }
 
+/**
+ * GetProductImages handles GET /products/:id/images.
+ * Returns the parsed image URL array for a single product.
+ */
 func GetProductImages(c *gin.Context) {
 	productIDStr := c.Param("id")
-	log.Printf("Recebendo requisição para imagens do produto ID: %s", productIDStr)
 
 	productID, err := strconv.ParseUint(productIDStr, 10, 64)
 	if err != nil {
-		log.Println("ID do produto inválido")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID do produto inválido"})
 		return
 	}
 
 	images, err := service.GetProductImages(uint(productID))
 	if err != nil {
-		log.Printf("Erro ao obter imagens: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter imagens do produto: " + err.Error()})
 		return
 	}
 
-	log.Printf("Enviando imagens para o frontend: %v", images)
 	c.JSON(http.StatusOK, images)
 }
 
-// GetUploadProgress retorna o progresso dos uploads para um produto
+/**
+ * GetUploadProgress returns the current upload progress for a product.
+ */
 func GetUploadProgress(c *gin.Context) {
 	productIDStr := c.Param("id")
 	productID, err := strconv.ParseUint(productIDStr, 10, 64)
@@ -282,4 +285,50 @@ func GetUploadProgress(c *gin.Context) {
 		"productId": productID,
 		"progress":  progress,
 	})
+}
+
+/**
+ * GetBatchProductImages handles GET /products/batch-images?ids=74,138,87.
+ * Returns a map of productID -> imageURLs for all requested products in a single response.
+ * Maximum 50 IDs per request to prevent abuse.
+ */
+func GetBatchProductImages(c *gin.Context) {
+	idsParam := c.Query("ids")
+	if idsParam == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Query parameter 'ids' is required"})
+		return
+	}
+
+	idStrings := strings.Split(idsParam, ",")
+	if len(idStrings) > 50 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Maximum 50 product IDs per batch request"})
+		return
+	}
+
+	var productIDs []uint
+	for _, idStr := range idStrings {
+		trimmed := strings.TrimSpace(idStr)
+		if trimmed == "" {
+			continue
+		}
+		id, err := strconv.ParseUint(trimmed, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid product ID: %s", trimmed)})
+			return
+		}
+		productIDs = append(productIDs, uint(id))
+	}
+
+	if len(productIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No valid product IDs provided"})
+		return
+	}
+
+	imagesMap, err := service.GetBatchProductImages(productIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter imagens em lote: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, imagesMap)
 }

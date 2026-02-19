@@ -50,6 +50,7 @@ func SetupRouter() *gin.Engine {
 		products.GET("", handler.GetProducts)
 		products.GET("/search", handler.SearchProducts)
 		products.GET("/:id/images", handler.GetProductImages)
+		products.GET("/batch-images", handler.GetBatchProductImages)
 	}
 
 	r.GET("/promotion", handler.GetPromotion)

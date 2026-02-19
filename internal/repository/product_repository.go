@@ -126,6 +126,9 @@ func UpdateProduct(product *model.Product) error {
 }
 
 func ParseImageUrls(imageUrls string) []string {
+	if imageUrls == "" {
+		return []string{}
+	}
 	return strings.Split(imageUrls, ",")
 }
 
@@ -149,4 +152,18 @@ func HardDeleteProduct(productID uint) error {
 		return err
 	}
 	return nil
+}
+
+/**
+ * GetProductsByIDs fetches multiple products in a single query using WHERE IN.
+ * This avoids N+1 queries when loading images for a batch of products.
+ *
+ * @param productIDs - Slice of product IDs to fetch
+ */
+func GetProductsByIDs(productIDs []uint) ([]model.Product, error) {
+	var products []model.Product
+	if err := config.DB.Where("id IN ?", productIDs).Find(&products).Error; err != nil {
+		return nil, err
+	}
+	return products, nil
 }
