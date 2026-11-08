@@ -16,28 +16,28 @@ var jwtSecret []byte
 var refreshSecret []byte
 
 const (
-	AccessTokenDuration  = 15 * time.Minute
+	AccessTokenDuration  = 24 * time.Hour
 	RefreshTokenDuration = 7 * 24 * time.Hour
 )
 
 /**
  * init validates JWT secrets on startup.
- * Requires JWT_SECRET with minimum 32 characters for security.
+ * Requires a strong JWT_SECRET (>= 32 chars) and aborts if it is missing.
+ * There is intentionally NO hardcoded fallback: a known default in a public
+ * repository would let anyone forge admin tokens.
  */
 func init() {
 	secret := os.Getenv("JWT_SECRET")
 	if len(secret) < 32 {
-		log.Println("WARNING: JWT_SECRET should have at least 32 characters for security")
-	}
-	if secret == "" {
-		secret = "development-secret-key-change-in-production"
-		log.Println("WARNING: Using default JWT_SECRET. Set JWT_SECRET environment variable in production!")
+		log.Fatal("JWT_SECRET é obrigatório e deve ter ao menos 32 caracteres. " +
+			"Defina a variável de ambiente (ex.: no Render e no .env local) antes de iniciar o servidor.")
 	}
 	jwtSecret = []byte(secret)
 
+	// O refresh secret pode ser derivado do JWT_SECRET (já forte) quando não informado.
 	refreshSecretEnv := os.Getenv("JWT_REFRESH_SECRET")
 	if refreshSecretEnv == "" {
-		refreshSecretEnv = secret + "-refresh"
+		refreshSecretEnv = secret + "-refresh-v2"
 	}
 	refreshSecret = []byte(refreshSecretEnv)
 }
