@@ -1,8 +1,8 @@
 package handler
 
 import (
+	"log"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -58,7 +58,8 @@ func DeleteCategory(c *gin.Context) {
 func GetCategories(c *gin.Context) {
 	categories, err := service.GetCategories()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter categorias: " + err.Error()})
+		log.Printf("Erro ao obter categorias: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter categorias"})
 		return
 	}
 
@@ -75,7 +76,8 @@ func GetCategoryImage(c *gin.Context) {
 
 	imageURL, err := service.GetCategoryImage(uint(categoryID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter imagem da categoria: " + err.Error()})
+		log.Printf("Erro ao obter imagem da categoria %d: %v", categoryID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter imagem da categoria"})
 		return
 	}
 
@@ -135,7 +137,8 @@ func DeleteCategoryImage(c *gin.Context) {
 	// Obtém a imagem da categoria do banco de dados
 	imagePath, err := service.GetCategoryImage(uint(categoryID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar imagem da categoria: " + err.Error()})
+		log.Printf("Erro ao buscar imagem da categoria %d: %v", categoryID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar imagem da categoria"})
 		return
 	}
 
@@ -145,16 +148,12 @@ func DeleteCategoryImage(c *gin.Context) {
 		return
 	}
 
-	// Remove a imagem do sistema de arquivos
-	localPath := "./uploads" + imagePath
-	if err := os.Remove(localPath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao remover a imagem do sistema de arquivos: " + err.Error()})
-		return
-	}
-
-	// Remove o caminho da imagem do banco de dados
+	// As imagens ficam hospedadas no ImgBB (URLs externas como https://i.ibb.co/...),
+	// não no filesystem local. A tentativa anterior de os.Remove("./uploads"+url)
+	// falhava sempre. Basta limpar a referência no banco de dados.
 	if err := service.RemoveCategoryImage(uint(categoryID)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao remover imagem do banco de dados: " + err.Error()})
+		log.Printf("Erro ao remover imagem da categoria %d no banco: %v", categoryID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao remover imagem da categoria"})
 		return
 	}
 

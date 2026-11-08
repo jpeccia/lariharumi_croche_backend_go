@@ -206,7 +206,8 @@ func SearchProducts(c *gin.Context) {
 	// Usa a nova função com metadados de paginação
 	paginatedResponse, err := service.SearchProductsWithMetadata(searchTerm, page, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar produtos: " + err.Error()})
+		log.Printf("Erro ao buscar produtos (termo=%q): %v", searchTerm, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar produtos"})
 		return
 	}
 
@@ -223,7 +224,8 @@ func GetProducts(c *gin.Context) {
 	// Usa a nova função com metadados de paginação
 	paginatedResponse, err := service.GetPaginatedProductsWithMetadata(page, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter produtos: " + err.Error()})
+		log.Printf("Erro ao obter produtos (page=%d, limit=%d): %v", page, limit, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter produtos"})
 		return
 	}
 
@@ -240,7 +242,8 @@ func GetProductsByCategory(c *gin.Context) {
 
 	products, err := service.GetProductsByCategory(uint(categoryID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter produtos da categoria: " + err.Error()})
+		log.Printf("Erro ao obter produtos da categoria %d: %v", categoryID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter produtos da categoria"})
 		return
 	}
 
@@ -262,7 +265,8 @@ func GetProductImages(c *gin.Context) {
 
 	images, err := service.GetProductImages(uint(productID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter imagens do produto: " + err.Error()})
+		log.Printf("Erro ao obter imagens do produto %d: %v", productID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter imagens do produto"})
 		return
 	}
 

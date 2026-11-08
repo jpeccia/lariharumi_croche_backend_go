@@ -30,10 +30,14 @@ func SetupRouter() *gin.Engine {
 	r.GET("/health", handler.HealthCheck)
 	r.GET("/ping", handler.Ping)
 
+	// Rate limit em /auth para mitigar brute-force de login e spam de registro.
+	// ~12 req/min sustentadas por IP, com pico de 10.
 	auth := r.Group("/auth")
+	auth.Use(middleware.RateLimit(0.2, 10))
 	{
 		auth.POST("/register", handler.RegisterUser)
 		auth.POST("/login", handler.LoginUser)
+		auth.POST("/refresh", handler.RefreshToken)
 	}
 
 	categories := r.Group("/categories")

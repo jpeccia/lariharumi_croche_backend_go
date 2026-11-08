@@ -46,25 +46,47 @@ func RegisterUser(name, email, password string) (*model.User, error) {
 	return user, nil
 }
 
-// LoginUser verifica o email e senha do usuário, e gera um token JWT se forem válidos
-func LoginUser(email, password string) (string, error) {
+// LoginUser verifica o email e senha do usuário e gera um par de tokens (acesso + refresh)
+func LoginUser(email, password string) (*util.TokenPair, error) {
 	// Busca o usuário no banco de dados
 	user, err := repository.GetUserByEmail(email)
 	if err != nil {
-		return "", errors.New("usuário não encontrado")
+		return nil, err
+	}
+	// GetUserByEmail retorna (nil, nil) quando não encontra — sem este check,
+	// o acesso a user.Password abaixo geraria panic (500) em vez de 401.
+	if user == nil {
+		return nil, errors.New("credenciais inválidas")
 	}
 
 	// Verifica a senha
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
-	if err != nil {
-		return "", errors.New("senha incorreta")
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		return nil, errors.New("credenciais inválidas")
 	}
 
-	// Gera o token JWT
-	token, err := util.GenerateToken(user)
+	// Gera o par de tokens JWT
+	tokens, err := util.GenerateTokenPair(user)
 	if err != nil {
-		return "", errors.New("erro ao gerar token")
+		return nil, errors.New("erro ao gerar token")
 	}
 
-	return token, nil
+	return tokens, nil
+}
+
+// RefreshTokens valida um refresh token e emite um novo par de tokens.
+func RefreshTokens(refreshToken string) (*util.TokenPair, error) {
+	userID, err := util.ParseRefreshToken(refreshToken)
+	if err != nil {
+		return nil, errors.New("refresh token inválido")
+	}
+
+	user, err := repository.GetUserByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errors.New("usuário não encontrado")
+	}
+
+	return util.GenerateTokenPair(user)
 }
