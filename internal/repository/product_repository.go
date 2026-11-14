@@ -118,6 +118,31 @@ func GetProductsByCategory(categoryID uint) ([]model.Product, error) {
 	return products, nil
 }
 
+// GetProductsByCategoryWithCount retorna produtos de uma categoria paginados,
+// com a contagem total, ordenados por nome (usa o índice composto cat+nome).
+func GetProductsByCategoryWithCount(categoryID uint, limit, offset int) ([]model.Product, int64, error) {
+	var products []model.Product
+	var total int64
+
+	if err := config.DB.Model(&model.Product{}).
+		Where("products.category_id = ?", categoryID).
+		Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := config.DB.Joins("Category").
+		Where("products.category_id = ?", categoryID).
+		Order("products.name ASC").
+		Limit(limit).
+		Offset(offset).
+		Find(&products).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return products, total, nil
+}
+
 func UpdateProduct(product *model.Product) error {
 	if err := config.DB.Save(product).Error; err != nil {
 		return err

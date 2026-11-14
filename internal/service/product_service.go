@@ -35,7 +35,7 @@ func CreateProduct(product *model.Product) error {
  * @param productID - The target product ID
  * @param imagePath - The new image URL to append
  */
-func AddProductImage(productID uint, imagePath string) error {
+func AddProductImage(productID uint, imagePath, thumbPath string) error {
 	product, err := repository.GetProductByID(productID)
 	if err != nil {
 		return err
@@ -44,10 +44,21 @@ func AddProductImage(productID uint, imagePath string) error {
 		return errors.New("produto não encontrado")
 	}
 
+	if thumbPath == "" {
+		thumbPath = imagePath
+	}
+
 	if product.ImageUrls != "" {
 		product.ImageUrls = product.ImageUrls + "," + imagePath
 	} else {
 		product.ImageUrls = imagePath
+	}
+
+	// Mantém ThumbUrls alinhado (mesma ordem/quantidade) com ImageUrls.
+	if product.ThumbUrls != "" {
+		product.ThumbUrls = product.ThumbUrls + "," + thumbPath
+	} else {
+		product.ThumbUrls = thumbPath
 	}
 
 	if err := repository.UpdateProduct(product); err != nil {
@@ -56,6 +67,9 @@ func AddProductImage(productID uint, imagePath string) error {
 
 	cacheService := &CacheService{}
 	cacheService.InvalidateProductImageCache(productID)
+	// A lista de produtos (grid) agora também carrega ThumbUrls; invalida para
+	// refletir a nova imagem.
+	cacheService.InvalidateProductCache()
 
 	return nil
 }
@@ -198,12 +212,20 @@ func DeleteProductImage(productID uint, index int) error {
 	imagePaths = append(imagePaths[:index], imagePaths[index+1:]...)
 	product.ImageUrls = repository.JoinImageUrls(imagePaths)
 
+	// Remove a miniatura no mesmo índice para manter ThumbUrls alinhado.
+	thumbPaths := repository.ParseImageUrls(product.ThumbUrls)
+	if index < len(thumbPaths) {
+		thumbPaths = append(thumbPaths[:index], thumbPaths[index+1:]...)
+		product.ThumbUrls = repository.JoinImageUrls(thumbPaths)
+	}
+
 	if err := repository.UpdateProduct(product); err != nil {
 		return err
 	}
 
 	cacheService := &CacheService{}
 	cacheService.InvalidateProductImageCache(productID)
+	cacheService.InvalidateProductCache()
 
 	return nil
 }
@@ -236,6 +258,43 @@ func GetProductsByCategory(categoryID uint) ([]model.Product, error) {
 	cacheService.SetCachedProductsByCategory(products, categoryID)
 
 	return products, nil
+}
+
+// GetProductsByCategoryWithMetadata retorna produtos de uma categoria paginados
+// no servidor, com metadados. Mantém a visão antiga (array completo) intacta;
+// esta é usada quando o cliente envia page/limit.
+func GetProductsByCategoryWithMetadata(categoryID uint, page, limit int) (*model.PaginatedResponse, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 12
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	cacheService := &CacheService{}
+	if cached, found := cacheService.GetCachedCategoryPaginated(categoryID, page, limit); found {
+		return cached, nil
+	}
+
+	offset := (page - 1) * limit
+
+	products, total, err := repository.GetProductsByCategoryWithCount(categoryID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := model.CalculatePagination(page, limit, total)
+	response := &model.PaginatedResponse{
+		Data:     products,
+		Metadata: metadata,
+	}
+
+	cacheService.SetCachedCategoryPaginated(response, categoryID, page, limit)
+
+	return response, nil
 }
 
 /**
@@ -343,6 +402,9 @@ func UpdateProduct(productID uint, updatedProduct *model.Product) error {
 	product.Name = updatedProduct.Name
 	product.Description = updatedProduct.Description
 	product.ImageUrls = updatedProduct.ImageUrls
+	// Numa edição manual das URLs não há miniaturas derivadas: zera ThumbUrls
+	// para o front cair no fallback de ImageUrls, evitando índices desalinhados.
+	product.ThumbUrls = updatedProduct.ThumbUrls
 	product.PriceRange = updatedProduct.PriceRange
 	product.CategoryID = updatedProduct.CategoryID
 

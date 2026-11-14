@@ -31,9 +31,71 @@ var sharedRestyClient = resty.New().
 
 // UploadResult representa o resultado de um upload
 type UploadResult struct {
-	URL   string `json:"url"`
-	Error error  `json:"error,omitempty"`
-	Index int    `json:"index"`
+	URL      string `json:"url"`
+	ThumbURL string `json:"thumbUrl,omitempty"`
+	Error    error  `json:"error,omitempty"`
+	Index    int    `json:"index"`
+}
+
+/**
+ * Limites de validação de upload. image.Decode carrega a imagem inteira em
+ * memória, então um arquivo muito grande poderia derrubar o processo; por isso
+ * rejeitamos antes de decodificar.
+ */
+const (
+	MaxUploadBytes = 15 << 20 // 15 MB por arquivo
+)
+
+// allowedUploadTypes são os MIME types aceitos (detectados pelo conteúdo real).
+var allowedUploadTypes = map[string]bool{
+	"image/jpeg": true,
+	"image/png":  true,
+	"image/gif":  true,
+	"image/webp": true,
+}
+
+/**
+ * validateImageFile valida tamanho e tipo real (pelos bytes) de um upload,
+ * antes de qualquer decodificação em memória.
+ */
+func validateImageFile(file *multipart.FileHeader) error {
+	if file.Size <= 0 {
+		return fmt.Errorf("arquivo vazio")
+	}
+	if file.Size > MaxUploadBytes {
+		return fmt.Errorf("arquivo muito grande (máx %d MB)", MaxUploadBytes>>20)
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return fmt.Errorf("falha ao abrir arquivo: %w", err)
+	}
+	defer src.Close()
+
+	// Detecta o tipo pelo conteúdo real (não confia na extensão nem no header).
+	head := make([]byte, 512)
+	n, _ := io.ReadFull(src, head)
+	contentType := http.DetectContentType(head[:n])
+	if !allowedUploadTypes[contentType] {
+		return fmt.Errorf("formato não suportado: %s", contentType)
+	}
+	return nil
+}
+
+/**
+ * extractImageURLs lê a resposta do ImgBB e retorna a URL original e uma
+ * miniatura (medium quando existe, senão display, senão a própria original).
+ */
+func extractImageURLs(responseBody string) (url string, thumb string) {
+	url = gjson.Get(responseBody, "data.url").String()
+	thumb = gjson.Get(responseBody, "data.medium.url").String()
+	if thumb == "" {
+		thumb = gjson.Get(responseBody, "data.display_url").String()
+	}
+	if thumb == "" {
+		thumb = url
+	}
+	return url, thumb
 }
 
 // UploadJob representa um trabalho de upload
@@ -160,6 +222,13 @@ func (us *UploadService) uploadSingleFile(file *multipart.FileHeader, index int)
 		}
 	}
 
+	if err := validateImageFile(file); err != nil {
+		return UploadResult{
+			Index: index,
+			Error: err,
+		}
+	}
+
 	src, err := file.Open()
 	if err != nil {
 		return UploadResult{
@@ -196,7 +265,7 @@ func (us *UploadService) uploadSingleFile(file *multipart.FileHeader, index int)
 		}
 	}
 
-	url := gjson.Get(resp.String(), "data.url").String()
+	url, thumb := extractImageURLs(resp.String())
 	if url == "" {
 		return UploadResult{
 			Index: index,
@@ -205,8 +274,9 @@ func (us *UploadService) uploadSingleFile(file *multipart.FileHeader, index int)
 	}
 
 	return UploadResult{
-		URL:   url,
-		Index: index,
+		URL:      url,
+		ThumbURL: thumb,
+		Index:    index,
 	}
 }
 
@@ -257,6 +327,10 @@ func UploadCategoryImageAsync(categoryID uint, file *multipart.FileHeader) (stri
 		return "", fmt.Errorf("IMGBB_API_KEY environment variable not found")
 	}
 
+	if err := validateImageFile(file); err != nil {
+		return "", err
+	}
+
 	src, err := file.Open()
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)
@@ -288,13 +362,14 @@ func UploadCategoryImageAsync(categoryID uint, file *multipart.FileHeader) (stri
 			return
 		}
 
-		url := gjson.Get(resp.String(), "data.url").String()
+		url, thumb := extractImageURLs(resp.String())
 		if url == "" {
 			resultChan <- UploadResult{Error: fmt.Errorf("URL not found in response")}
 			return
 		}
 
-		resultChan <- UploadResult{URL: url}
+		// Para o card de categoria basta a versão reduzida (display/medium).
+		resultChan <- UploadResult{URL: thumb}
 	}()
 
 	result := <-resultChan

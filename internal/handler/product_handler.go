@@ -102,8 +102,8 @@ func UploadProductImages(c *gin.Context) {
 			errors = append(errors, fmt.Sprintf("Imagem %d: %v", result.Index, result.Error))
 		} else {
 			uploadedUrls = append(uploadedUrls, result.URL)
-			// Salva a URL no banco de dados
-			if err := service.AddProductImage(uint(productID), result.URL); err != nil {
+			// Salva a URL (e a miniatura) no banco de dados
+			if err := service.AddProductImage(uint(productID), result.URL, result.ThumbURL); err != nil {
 				log.Printf("Erro ao salvar imagem %s no banco: %v", result.URL, err)
 			}
 		}
@@ -237,6 +237,25 @@ func GetProductsByCategory(c *gin.Context) {
 	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID da categoria inválido"})
+		return
+	}
+
+	// Paginação opcional e retrocompatível: se o cliente mandar page ou limit,
+	// devolve { data, metadata }; senão mantém o array completo (comportamento
+	// antigo que o front atual espera).
+	pageStr := c.Query("page")
+	limitStr := c.Query("limit")
+	if pageStr != "" || limitStr != "" {
+		page, _ := strconv.Atoi(pageStr)
+		limit, _ := strconv.Atoi(limitStr)
+
+		paginated, err := service.GetProductsByCategoryWithMetadata(uint(categoryID), page, limit)
+		if err != nil {
+			log.Printf("Erro ao obter produtos da categoria %d (paginado): %v", categoryID, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao obter produtos da categoria"})
+			return
+		}
+		c.JSON(http.StatusOK, paginated)
 		return
 	}
 

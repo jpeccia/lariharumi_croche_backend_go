@@ -66,6 +66,31 @@ func (cs *CacheService) SetCachedProductsByCategory(products []model.Product, ca
 }
 
 /**
+ * GetCachedCategoryPaginated retrieves a paginated category response from cache.
+ * A chave começa com "products_category", então é invalidada pelos padrões
+ * existentes (products*, products_category*).
+ */
+func (cs *CacheService) GetCachedCategoryPaginated(categoryID uint, page, limit int) (*model.PaginatedResponse, bool) {
+	key := cache.GenerateKey("products_category_paginated", categoryID, page, limit)
+	var response model.PaginatedResponse
+
+	err := cache.Get(key, &response)
+	if err != nil {
+		return nil, false
+	}
+
+	return &response, true
+}
+
+/**
+ * SetCachedCategoryPaginated stores a paginated category response in cache.
+ */
+func (cs *CacheService) SetCachedCategoryPaginated(response *model.PaginatedResponse, categoryID uint, page, limit int) {
+	key := cache.GenerateKey("products_category_paginated", categoryID, page, limit)
+	cache.Set(key, response, ProductTTL)
+}
+
+/**
  * GetCachedSearchProducts retrieves search results from cache.
  */
 func (cs *CacheService) GetCachedSearchProducts(searchTerm string, limit, offset int) ([]model.Product, bool) {
